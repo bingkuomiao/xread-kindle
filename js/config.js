@@ -9,8 +9,11 @@ window.READER_CONFIG = {
     // 服务器类型：app | multi | single (app 表示手机应用模式,single|multi 表示服务器的单用户/多用户模式)
     type: "multi",
     
-    // 服务器地址（xread-fpk 默认监听 0.0.0.0:7777，按实际部署地址修改）
-    address: "http://192.200.217.59:7777",
+    // 服务器地址：留空 = 自动使用「加载本页面的源」(http://host:port)。
+    // 这样把 XRead-kindle 挂到后端的 /xread 子路径后，API 会自动指向同源的 /reader3/...，
+    // 在 7777 / 7778 等不同端口部署都能免 CORS 复用同一后端，无需修改此处。
+    // 如需指向独立后端，可填完整地址，例如 "http://192.168.31.51:7777"。
+    address: "",
     
     // 登录用户名（仅server类型需要）
     username: "",

@@ -79,6 +79,19 @@ var contentElement = null,
     sourceColumn1 = null,
     sourceColumn2 = null;
 
+// 解析 API 基地址（同源自适应，便于 XRead-kindle 挂在 /xread 子路径、在 7777/7778 等任意端口复用同一后端）
+// - address 为空 → 使用页面所在源（http://host:port），API 自动指向同源的 /reader3/...
+// - address 为完整 http(s) URL → 原样使用
+// - address 仅 host:port（登录框可能只填这项）→ 补上当前协议
+// - address 以 / 开头 → 作为根相对路径
+function apiBase() {
+    var a = config.address;
+    if (!a) return window.location.origin;
+    if (/^https?:\/\//i.test(a)) return a.replace(/\/+$/, "");
+    if (a.charAt(0) === "/") return a.replace(/\/+$/, "");
+    return window.location.protocol + "//" + a.replace(/\/+$/, "");
+}
+
 function url(router, data) {
     if (config.type == "app") {
         router += "?v=" + new Date().getTime() + "&accessToken=" + accessToken;
@@ -102,7 +115,7 @@ function url(router, data) {
     } else {
         router = "/reader3/" + router;
     }
-    return config.address + router;
+    return apiBase() + router;
 }
 
 // 字符串全局替换
@@ -458,7 +471,7 @@ function createBookItemElement(book, index) {
     if (!coverUrl) {
         coverUrl = "img/noCover.jpg";
     } else if (coverUrl.indexOf('http') !== 0) {
-        coverUrl = config.address + coverUrl;
+        coverUrl = apiBase() + coverUrl;
     }
     
     // 构建书籍项HTML结构
@@ -2615,7 +2628,7 @@ function loginBookshelf() {
 function updateLoginConfig(){
     loadingP = $("#logining");
     config.type = $("#type").value;
-    config.address = $("#address").value || location.host;
+    config.address = $("#address").value.trim() || window.location.origin;
 }
 
 function login() {
