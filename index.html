@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/html">
+<head>
+    <meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+    <meta name="viewport"
+          content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,minimal-ui,viewport-fit=cover"/>
+    <!--强制清除缓存-->
+    <meta http-equiv="cache-control" content="no-cache"/>
+    <meta http-equiv="Pragma" content="no-cache"/>
+    <meta http-equiv="expires" content="0"/>
+    <title>阅读</title>
+    <link rel="icon" href="img/favicon.ico">
+    <link rel="stylesheet" href="css/kindle.css"/>
+    <!-- 引入配置文件 -->
+    <script type="application/javascript" src="js/config.js"></script>
+</head>
+<body>
+
+<!--主界面-->
+<div id="kindle">
+    <!-- 登录界面 -->
+    <div id="login" class="c_login">
+        <!-- 登录界面背景图 -->
+        <div class="login-bg-bottom">
+            <img src="img/bg.jpg" alt="底部背景" class="login-bg-image">
+        </div>
+        <form role="form" class="login-content">
+            <div class="form-group">
+                <div class="form-row">
+                    <label for="type" class="form-label">类型 </label>
+                <div class="input-wrapper">
+                    <select class="form-control" id="type">
+                        <option value="multi">服务器多用户</option>
+                        <option value="single">服务器单用户</option>
+                        <option value="app">手机应用</option>
+                    </select>
+                </div>
+                </div>
+
+                <div class="form-row">
+                    <label for="address" class="form-label">地址 </label>
+                    <div class="input-wrapper">
+                        <input type="text" class="form-control" id="address" placeholder="http://服务器地址:端口" autocomplete="url"/>
+                    </div>
+                </div>
+
+                <div class="serverSecured">
+                    <div class="form-row">
+                        <label for="username" class="form-label">用户 </label>
+                    <div class="input-wrapper">
+                        <input type="text" class="form-control" id="username" placeholder="请输入用户名" autocomplete="username"/>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <label for="password" class="form-label">密码 </label>
+                    <div class="input-wrapper">
+                        <input type="password" class="form-control" id="password" placeholder="请输入密码" autocomplete="current-password"/>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button type="button" class="btn-primary" data-action="login">登录</button>
+                    <img id="logining" class="login-loading" src="img/loading.gif">
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- 阅读界面顶部菜单 -->
+    <div id="topMenu" class="top-menu">
+        <div class="top-menu-left">
+            <div class="icon-button" data-action="getBookshelf">
+                <img src="img/shelf.png" alt="书架" class="menu-icon">
+                <span class="menu-text">书架</span>
+            </div>
+        </div>
+
+        <div class="top-menu-middle">
+            <div class="icon-button" data-action="showSourceList">
+                <img src="img/source.png" alt="书源" class="menu-icon">
+                <span class="menu-text">书源</span>
+            </div>
+        </div>
+
+        <div class="top-menu-right">
+            <div class="icon-button" data-action="logout">
+                <img src="img/logout.png" alt="注销" class="menu-icon">
+                <span class="menu-text">注销</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 阅读界面底部菜单 -->
+    <div id="bottomMenu" class="bottom-menu">
+        <div class="bottom-menu-left">
+            <div class="icon-button" data-action="showChapterList">
+                <img src="img/catalog.png" alt="目录" class="menu-icon">
+                <span class="menu-text">目录</span>
+            </div>
+        </div>
+
+        <div class="bottom-menu-right">
+            <div class="icon-button" data-action="show" data-target=".font-config">
+                <img src="img/gear.png" alt="设置" class="menu-icon">
+                <span class="menu-text">设置</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 阅读界面 -->
+    <div id="content" class="c_content">
+        <!-- 书架 -->
+        <div id="bookshelf" class="c_bookshelf">
+            <!--书架列表栏-->
+            <div id="bookList" class="row"></div>
+        </div>
+
+        <!-- 书籍内容界面 -->
+        <div id="text-measurer" style="position: absolute; visibility: hidden;"></div>
+        <div id="bookContent" class="row c_bookContent"></div>
+    </div>
+    <!--书籍信息栏-->
+    <div id="menu" class="menu">
+        <div style="width: 100%">
+            <div id="titleAndChapter" class="titleAndChapter"></div>
+            <div id="contentPageInfo" class="contentPageInfo"></div>
+        </div>
+    </div>
+</div>
+
+<!--设置模态框-->
+<div class="font-config modal">
+    <div class="modal-content">
+        <span class="close" data-action="hide" data-target=".font-config">&times;</span>
+        <form role="form" class="config-content">
+            <!-- 字体样式设置区域 -->
+            <h2>配置字体</h2>
+            <div class="form-row">
+            <label for="font-config" class="form-label">字体：</label>
+            <div class="input-wrapper">
+                <div class="font-selector">
+                    <select id="fontFamily" class="form-control">
+                        <option>系统默认</option>
+                        <option>世间美好</option>
+                        <option>云朵字体</option>
+                        <option>糯米圆体</option>
+                        <option>御风楷体</option>
+                        <option>方正品尚</option>
+                    </select>
+                    <div class="bold-control">
+                        <input type="checkbox" id="contentFontWight" class="checkbox-control">
+                        <label for="contentFontWight" class="bold-label">加粗</label>
+                    </div>
+                </div>
+            </div>
+            </div>
+
+            <div class="form-row">
+            <label for="font-config" class="form-label">字号：</label>
+            <div class="input-wrapper">
+                <input type="number" id="contentFontSize" value="" class="form-control number-input">
+                </div>
+            </div>
+
+            <div class="form-row">
+            <label for="font-config" class="form-label">字距：</label>
+            <div class="input-wrapper">
+                <input type="number" id="letterSpacing" value="" class="form-control number-input">
+                </div>
+            </div>
+
+            <div class="form-row">
+            <label for="font-config" class="form-label">行距：</label>
+            <div class="input-wrapper">
+                <input type="number" id="lineHeight" value="" step="0.1" class="form-control number-input">
+                </div>
+            </div>
+            
+            <!-- 翻页方式区域 -->
+            <h2>配置翻页</h2>
+            <div class="page-turning-section">
+                <div class="form-row">
+                <label for="font-config" class="form-label">翻页：</label>
+
+                <div class="page-turning-content-cell">
+                    <div class="page-turning-options">
+                        <div class="page-option">
+                            <label for="changePageFunNum1">
+                                <img src="img/1.png" class="page-image"> <br>
+                                <input id="changePageFunNum1" value="1" type="radio" name="changePageFunNum" class="page-radio">
+                            </label>
+                        </div>
+                        <div class="page-option">
+                            <label for="changePageFunNum2">
+                                <img src="img/2.png" class="page-image"> <br>
+                                <input id="changePageFunNum2" value="2" type="radio" name="changePageFunNum" class="page-radio">
+                            </label>
+                        </div>
+                        <div class="page-option">
+                            <label for="changePageFunNum3">
+                                <img src="img/3.png" class="page-image"> <br>
+                                <input id="changePageFunNum3" value="3" type="radio" name="changePageFunNum" class="page-radio">
+                            </label>
+                        </div>
+                        <div class="page-option">
+                            <label for="changePageFunNum4">
+                                <img src="img/4.png" class="page-image"> <br>
+                                <input id="changePageFunNum4" value="4" type="radio" name="changePageFunNum" class="page-radio">
+                            </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 确定按钮 -->
+            <div class="button-group">
+                <button type="button" class="btn-primary" data-action="refreshConfig">确定</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="white modal">
+    <div id="debug" style="background-color: white; font-size: 15px;"></div>
+</div>
+
+<!--目录模态框-->
+<div class="bookChapterList modal">
+    <div class="modal-content">
+        <span class="close" data-action="hide" data-target=".bookChapterList">&times;</span>
+        <div class="modal-title-container">
+            <h1 id="chapterTitle">书名</h1> 
+        </div>
+        <div id="chapterNameList" class="modal-list">
+            <div class="modal-columns-container">
+                <div class="modal-column" id="chapterColumn1"></div>
+                <div class="modal-column" id="chapterColumn2"></div>
+            </div>
+        </div>
+        <div class="modal-menu">
+            <div class="modal-menu-left">
+                <button data-action="getChapterList" data-args="1,showChapterListNum,true">刷新</button>
+                <button data-action="jumpChapterList" data-args="-1">上一页</button>
+            </div>
+
+            <div class="modal-menu-right">
+                <button data-action="jumpChapterList" data-args="1">下一页</button>
+                <span id="chapterPageNo" class="page-info">1</span>
+                <span class="page-separator page-info">/</span>
+                <span id="chapterPageTotal" class="page-info">1</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!--书源模态框-->
+<div class="bookSourceList modal">
+    <div class="modal-content">
+        <span class="close" data-action="hide" data-target=".bookSourceList">&times;</span>
+        <div class="modal-title-container">
+            <h1 id="sourceTitle">书名</h1> 
+            <img id="sourcing" class="source-loading" src="img/loading.gif"> 
+        </div>
+        <div id="sourceNameList" class="modal-list">
+            <div class="modal-columns-container">
+                <div class="modal-column" id="sourceColumn1"></div>
+                <div class="modal-column" id="sourceColumn2"></div>
+            </div>
+        </div>
+        <div class="modal-menu">
+            <div class="modal-menu-left">
+                <button data-action="getSourceList" data-args="0,lastSourceIndex,showSourceListNum,true">更多书源</button>
+                <button data-action="prevSourcePage">上一页</button>
+            </div>
+
+            <div class="modal-menu-right">
+                <button data-action="nextSourcePage">下一页</button>
+                <button data-action="deleteBookItem">移除书籍</button>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+<!-- 引入调试文件 -->
+<!-- <script type="application/javascript" src="js/test.js"></script> -->
+<!-- 引入主程序文件 -->
+<script type="application/javascript" src="js/kindle.js"></script>
+</html>
