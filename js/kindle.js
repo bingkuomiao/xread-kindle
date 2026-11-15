@@ -79,6 +79,12 @@ var contentElement = null,
     sourceColumn1 = null,
     sourceColumn2 = null;
 
+// 返回「加载本页面的源」(http://host:port)，兼容老 Kindle 浏览器
+// —— 老 WebKit 没有 window.location.origin，只能用 protocol + host 拼接
+function pageOrigin() {
+    return window.location.protocol + "//" + window.location.host;
+}
+
 // 解析 API 基地址（同源自适应，便于 XRead-kindle 挂在 /xread 子路径、在 7777/7778 等任意端口复用同一后端）
 // - address 为空 → 使用页面所在源（http://host:port），API 自动指向同源的 /reader3/...
 // - address 为完整 http(s) URL → 原样使用
@@ -86,7 +92,7 @@ var contentElement = null,
 // - address 以 / 开头 → 作为根相对路径
 function apiBase() {
     var a = config.address;
-    if (!a) return window.location.origin;
+    if (!a) return pageOrigin();
     if (/^https?:\/\//i.test(a)) return a.replace(/\/+$/, "");
     if (a.charAt(0) === "/") return a.replace(/\/+$/, "");
     return window.location.protocol + "//" + a.replace(/\/+$/, "");
@@ -1986,7 +1992,13 @@ function initCSSLoadValue() {
     inputIds.forEach(function(id) {
         var element = $("#" + id);
         if (element) {
-            element.value = config[id] || element.value || "";
+            if (id === "address" && !config.address) {
+                // fpk 部署时登录框默认填「飞牛本机地址」(= 当前访问的源)，
+                // Kindle 老浏览器无需手输 IP:端口；清空也可用（apiBase 自动同源）。
+                element.value = pageOrigin();
+            } else {
+                element.value = config[id] || element.value || "";
+            }
             preloadLog("系统默认配置: " + id + " value: " + element.value);
         }
     });
@@ -2628,7 +2640,7 @@ function loginBookshelf() {
 function updateLoginConfig(){
     loadingP = $("#logining");
     config.type = $("#type").value;
-    config.address = $("#address").value.trim() || window.location.origin;
+    config.address = $("#address").value.trim() || pageOrigin();
 }
 
 function login() {
