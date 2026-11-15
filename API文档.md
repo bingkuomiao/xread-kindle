@@ -1,8 +1,8 @@
-# kabi-reader 后端 API 接口文档
+# xread-kindle 对接的后端 API 接口文档
 
 > 整理来源：`index.html`、`js/config.js`、`js/kindle.js`
 > 项目性质：纯静态前端阅读器（HTML/CSS/JS），通过 `window.READER_CONFIG` 配置服务器，调用后端 REST 接口渲染书架、目录、正文、书源。
-> 代码仓库：`https://github.com/bingkuomiao/kabi-reader`（私有库，经 GitHub MCP 连接器读取）
+> 代码仓库：`https://github.com/bingkuomiao/xread-kindle`（私有库，经 GitHub MCP 连接器读取）
 
 ---
 
@@ -281,8 +281,6 @@ refresh=0&url={bookUrl}&name={bookName}&searchSize={pageSize}&lastIndex={sourceI
 | `fonts/YuFengKaiTi.woff` | 御风楷体 | 楷体风格 |
 | `fonts/NuoMiYuanTi.woff` | 糯米圆体 | 圆体风格 |
 | `fonts/yunduo.woff` | 云朵字体 | 云朵风格 |
-| `fonts/ShiJianMeiHao.woff` | 世间美好 | 美好风格（约 1.19 MB） |
-| `fonts/FangZhengPinShang.woff` | 方正品尚 | 方正品尚风格 |
 
 > 前端 `fontFamilyMap`（kindle.js:2130）将配置项映射到上述字体名；默认配置 `fontFamily: "系统默认"`，即不加载自定义字体。
 
@@ -291,19 +289,19 @@ refresh=0&url={bookUrl}&name={bookName}&searchSize={pageSize}&lastIndex={sourceI
 沙箱内**无法直接下载这些字体文件**，原因：
 
 1. `git clone` / `raw.githubusercontent.com` 被沙箱防火墙拦截（HTTP 000，无代理出口）；
-2. GitHub 内容接口对每个文件有 1 MB 限制，上述字体均超过该上限（已验证 `ShiJianMeiHao.woff` 为 1,192,164 字节），MCP 仅返回 `download_url` 而非内容；
+2. GitHub 内容接口对每个文件有 1 MB 限制，上述字体均超过该上限，MCP 仅返回 `download_url` 而非内容；
 3. 经 MCP 文本通道取得的二进制会被转义、不可靠还原为真实 `.woff`。
 
 **请在拥有仓库访问权限的本机执行**（仓库已克隆的情况下）将字体复制到本项目 `fonts/` 目录：
 
 ```bash
-# 在你的本地 kabi-reader 仓库内，复制字体到本项目 fonts 目录
-cp fonts/*.woff /workspace/kabi-reader/fonts/
+# 在你的本地 xread-kindle 仓库内，复制字体到本项目 fonts 目录
+cp fonts/*.woff /workspace/xread-kindle/fonts/
 ```
 
 若本机也未克隆，执行：
 
 ```bash
-git clone https://github.com/bingkuomiao/kabi-reader.git /tmp/kabi-reader
-cp /tmp/kabi-reader/fonts/*.woff /workspace/kabi-reader/fonts/
+git clone https://github.com/bingkuomiao/xread-kindle.git /tmp/xread-kindle
+cp /tmp/xread-kindle/fonts/*.woff /workspace/xread-kindle/fonts/
 ```

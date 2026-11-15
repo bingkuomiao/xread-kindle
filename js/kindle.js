@@ -7,7 +7,7 @@ var config = window.READER_CONFIG || {
     salt: "",
     contentFontSize: 47,
     lineHeight: 1.3,
-    fontFamily: "system",
+    fontFamily: "系统",
     fontWeight: "normal",
     letterSpacing: 7,
     menuFontSizeRatio: 0.5,
@@ -15,6 +15,65 @@ var config = window.READER_CONFIG || {
     debugMode: false,
     debugLevel: 0
 };
+
+// 服务器类型不再由用户选择：直接沿用 fpk 安装向导的「多用户鉴权 (SECURE)」。
+// cmd/main 每次启动会把 SECURE 注入 /xread/index.html 的 window.__XREAD_CONFIG__：
+//   SECURE=true  -> "multi"  （服务器多用户，需登录）
+//   SECURE=false -> "single" （服务器单用户，免登录）
+// 未走 fnOS 生命周期脚本（例如独立静态部署）时，回退到 config.js 里的 type 默认值。
+(function () {
+    var rc = window.__XREAD_CONFIG__;
+    if (!rc || typeof rc.secure === "undefined") return;
+    var secure = rc.secure;
+    if (typeof secure === "string") {
+        secure = secure !== "false" && secure !== "0" && secure !== "no" && secure !== "off";
+    }
+    config.type = secure ? "multi" : "single";
+})();
+
+// r39-3) 正文字号默认值按「是否 Kindle」区分（不再用视口宽度，PC 宽屏也要 21px）：
+//   Kindle PW7（html 无 xread-browser class）维持原默认 47px（大屏大字）；
+//   非 Kindle 浏览器（手机/PC，html 有 xread-browser class）默认 21px。
+//   UA 检测脚本在 head 最先执行并加 class，此处一定能读到。
+//   config 每次从 config.js 读取、无本地持久化，故此默认值每次加载稳定生效；
+//   用户在设置页改动后由 applyFontSettings 即时生效，不受此处影响。
+(function () {
+    var html = document.documentElement;
+    var isBrowser = html.className && html.className.indexOf("xread-browser") !== -1;
+    if (isBrowser && config.contentFontSize === 47) {
+        config.contentFontSize = 21;
+    }
+})();
+
+// 登录/注册模式：底部「注册」入口复用同一张表单，只切换标题/按钮文字，
+// 不新增输入框，保持 Kindle 老浏览器的表单结构最简单。
+var loginMode = "login"; // "login" | "register"
+
+// 按 id 就地改文字（不替换元素本身，initEventListeners 绑定的点击事件不会丢）
+function setLoginText(id, text) {
+    var el = document.getElementById(id);
+    if (el) el.innerHTML = text;
+}
+
+// 「没有账号？注册」<->「已有账号？登录」
+function toggleLoginMode() {
+    if (loginMode === "login") {
+        loginMode = "register";
+        setLoginText("loginTitle", "注册");
+        setLoginText("loginSubtitle", "创建账号以同步你的阅读数据");
+        setLoginText("loginSubmit", "注册");
+        setLoginText("loginFooterText", "已有账号？");
+        setLoginText("loginToggle", "登录");
+    } else {
+        loginMode = "login";
+        setLoginText("loginTitle", "登录");
+        setLoginText("loginSubtitle", "登录以同步你的阅读数据");
+        setLoginText("loginSubmit", "登录");
+        setLoginText("loginFooterText", "没有账号？");
+        setLoginText("loginToggle", "注册");
+    }
+}
+
 // 接口配置
 var login_url = "login",
     logout_url = "logout",
@@ -25,7 +84,14 @@ var login_url = "login",
     // xread-fpk 没有 searchBookSource 路由，使用等价的 getAvailableBookSource 替代
     searchBookSource = "getAvailableBookSource",
     setBookSource = "setBookSource",
-    deleteBook = "deleteBook";
+    deleteBook = "deleteBook",
+    // 书籍分组：后端已有接口，用于把当前书籍移动到已有分组（0 = 未分组）
+    getBookGroups = "getBookGroups",
+    saveBookGroupId = "saveBookGroupId",
+    // 服务端整书缓存（SSE 进度流），用于「缓存书籍」加速
+    cacheBookSSE = "cacheBookSSE",
+    // 清除服务端整书缓存
+    deleteBookCache = "deleteBookCache";
 // 缓存数据
 var screenWidth = window.screen.width,    // 屏幕宽度
     screenHeight = window.screen.height,  // 屏幕高度
@@ -45,6 +111,7 @@ var screenWidth = window.screen.width,    // 屏幕宽度
     currentBookPage = 1,                  // 当前文本页码
     currentBookTotalPage = 1,             // 当前文本总页码
     pageList = [],                        // 页码和内容对应关系
+    isComicMode = false,                  // 漫画模式：一张图一页
     bookContentHeight,                    // 页面高度
     currentBookUrl = "",                  // 当前书籍URL
     currentBookName = "",                 // 当前书籍名称
@@ -244,31 +311,34 @@ function formatChapterTitle(title) {
 // 章节内容格式化函数 
 function formatChapterContent(content) {
     var indentSpaces = "　　"; // 缩进空格（两个全角空格）
-    
     if (!content) {
         return content;
     }
-    
-    var lines = content.split('\n');
+
+    // 后端正文可能是纯文本，也可能带 HTML 换行/段落标签。
+    // 先统一归一化为 \n，否则整段会被当成「一行」，残留的 <br> 在渲染时
+    // 变成连续换行，正文里就会出现大面积空白行。
+    var normalized = content
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p\s*>/gi, "\n")
+        .replace(/<p[^>]*>/gi, "")
+        .replace(/&nbsp;|&#160;/gi, " ")
+        .replace(/\r/g, "");
+
+    var lines = normalized.split("\n");
     var formattedLines = [];
-    
     for (var i = 0; i < lines.length; i++) {
-        var line = lines[i].trim();
-        
-        // 去除空行
-        if (line === '') {
+        var line = lines[i].replace(/\t/g, " ").trim();
+        // 去掉所有空行（含仅由空格/全角空格构成的行）
+        if (line === "") {
             continue;
         }
-        
-        // 段落缩进 - 简化条件判断
         if (line.indexOf(indentSpaces) !== 0) {
             line = indentSpaces + line;
         }
-        
         formattedLines.push(line);
     }
-    
-    return formattedLines.join('\n');
+    return formattedLines.join("\n");
 }
 
 //获取字符串
@@ -281,12 +351,13 @@ function freshTime() {
   //$("#nowTime").textContent = formatTime("HH:mm");
 }
 
+// 转圈动画已取消：登录按钮下方的 loading.gif 不再引入。
+// 保留 loading()/loadingOver() 为空实现，供 HttpGet/HttpPost 等既有调用点继续使用，
+// 不再显示或隐藏任何加载动画元素。
 function loading() {
-  loadingP.style.display = "inline-block";
 }
 
 function loadingOver() {
-  loadingP.style.display = "none";
 }
 
 //待实现
@@ -465,7 +536,8 @@ function freshBookCache() {
 
 //书籍项创建函数（用于书架）
 function createBookItemElement(book, index) {
-    const bookItem = document.createElement('div');
+    // ES5 兼容：老 Kindle WebKit 534 对块级常量声明支持有缺陷，点书架执行到此处会抛异常，统一用 var。
+    var bookItem = document.createElement('div');
     bookItem.className = 'book-item';
     
     // 处理封面URL
@@ -1344,10 +1416,17 @@ function disposeBookContent(targetChapterIndex, bookStr) {
     show(".c_bookContent");
     var currentChapterName = bookChapterMapCache[targetChapterIndex].title;
     setTitle(currentBookName, currentChapterName);
-    // 格式化章节内容
-    bookStr = currentChapterName + "<br/>" + formatChapterContent(bookStr);
+    // 漫画检测：章节含多张图片时走「一张图一页」，绕开按字符硬切（否则只显示第一张图）
+    var imgList = bookStr.match(/<img\b[^>]*>/gi);
+    if (imgList && imgList.length > 1) {
+        isComicMode = true;
+        pageList = imgList;
+    } else {
+        isComicMode = false;
+        bookStr = currentChapterName + "\n" + formatChapterContent(bookStr);
+        pageList = calculateCharsPerPage(bookStr);
+    }
     currentBookPage = 1;
-    pageList = calculateCharsPerPage(bookStr);
     currentBookTotalPage = pageList.length;
 }
 
@@ -1356,7 +1435,23 @@ function showContent(pages) {
     if (currentBookPage > currentBookTotalPage) {
         currentBookPage = currentBookTotalPage;
     }
-    contentElement.innerHTML = pages[currentBookPage - 1].replace(/\n/g, '<br>');
+    if (isComicMode) {
+        // 漫画：一页一张图，图片按内容区尺寸自适应（老 WebKit 用 style 直接设，稳）
+        var imgHtml = pages[currentBookPage - 1] || "";
+        contentElement.innerHTML = '<div class="comic-page">' + imgHtml + '</div>';
+        var theImg = contentElement.querySelector('img');
+        if (theImg) {
+            var cw = contentElement.clientWidth || 600;
+            var ch = contentElement.clientHeight || 800;
+            theImg.style.maxWidth = cw + 'px';
+            theImg.style.maxHeight = ch + 'px';
+        }
+    } else {
+        var pageHtml = pages[currentBookPage - 1].replace(/\n/g, '<br>');
+        // 兜底：压缩连续换行，避免正文出现大面积空白行
+        pageHtml = pageHtml.replace(/(<br\s*\/?>\s*){2,}/gi, '<br>');
+        contentElement.innerHTML = pageHtml;
+    }
     setContentPageInfo();
 }
 
@@ -1493,7 +1588,6 @@ function textMeasurerHigh(text) {
 // 计算每页显示的字符内容
 function calculateCharsPerPage(bookStr) {
     var containerHeight = contentElement.clientHeight;
-
     var pages = [];
     var currentPage = "";
     var tempPage = "";
@@ -1703,11 +1797,402 @@ function jumpSourcePage(offset) {
     loadingOver();
 }
 
-// 显示书源列表
-function showSourceList() {
-    currentSourcePage = 1; // 重置为第一页
-    getSourceList(1, sourcePageSize, false);
+// 显示书籍管理弹窗（书源切换已停用）
+// 当前后端无可用换源候选，书源列表恒为空且一直转圈；改为只显示书名 +「移动书籍」+「移除书籍」。
+// 不调用 getSourceList()，也就不会再发书源请求、不再出现加载中的转圈图标。
+function showBookManage() {
+    // 未登录时不显示书籍管理（与书架管理一致），防止弹窗穿透登录界面
+    if (!accessToken) {
+        hide(".bookSourceList");
+        return;
+    }
+    // 标题沿用弹窗原有的 #sourceTitle，直接显示当前书名
+    var titleEl = document.getElementById("sourceTitle");
+    if (titleEl) {
+        titleEl.innerHTML = currentBookName || "书籍管理";
+    }
+    // 每次打开都收起移动/删除面板，清空提示，避免残留上一次操作
+    var panel = document.getElementById("bookGroupPanel");
+    if (panel) panel.style.display = "none";
+    var dpanel = document.getElementById("bookDeletePanel");
+    if (dpanel) dpanel.style.display = "none";
+    var chk = document.getElementById("confirmDeleteCheck");
+    if (chk) chk.checked = false;
+    var hint = document.getElementById("bookGroupHint");
+    if (hint) hint.innerHTML = "";
+    var mhint = document.getElementById("bookManageHint");
+    if (mhint) mhint.innerHTML = "";
     show(".bookSourceList");
+}
+
+// ===== 移动书籍到已有分组 =====
+// 后端接口：GET  getBookGroups   -> [{groupId, groupName, orderNo}]
+//           POST saveBookGroupId {bookUrl, groupId} -> 把书籍 group 设为指定分组（0 = 未分组）
+var bookGroupsCache = [];
+
+function loadBookGroups() {
+    var sel = document.getElementById("bookGroupSelect");
+    var hint = document.getElementById("bookGroupHint");
+    if (!sel) {
+        return;
+    }
+    sel.options.length = 0;
+    sel.options.add(new Option("未分组", "0"));
+    bookGroupsCache = [];
+    if (hint) {
+        hint.innerHTML = "正在读取分组…";
+    }
+
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", url(getBookGroups), true);
+    if (config.type == "multi") {
+        xhr.withCredentials = true;
+    }
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState !== 4) {
+            return;
+        }
+        if (xhr.status === 200) {
+            var res = null;
+            try {
+                res = JSON.parse(xhr.responseText);
+            } catch (e) {
+                res = null;
+            }
+            var groups = (res && res.data && res.data.length) ? res.data : [];
+            for (var i = 0; i < groups.length; i++) {
+                var g = groups[i];
+                var gid = parseInt(g.groupId, 10);
+                if (isNaN(gid)) {
+                    gid = 0;
+                }
+                sel.options.add(new Option(g.groupName || ("分组" + gid), String(gid)));
+            }
+            bookGroupsCache = groups;
+            if (hint) {
+                hint.innerHTML = groups.length
+                    ? "选择分组后立即生效"
+                    : "暂无分组，可先在网页端新建分组";
+            }
+        } else {
+            if (hint) {
+                hint.innerHTML = "分组读取失败，请稍后重试";
+            }
+        }
+    };
+    xhr.send();
+}
+
+function showMoveBookPanel() {
+    var panel = document.getElementById("bookGroupPanel");
+    if (!panel) {
+        return;
+    }
+    var dpanel = document.getElementById("bookDeletePanel");
+    if (panel.style.display === "block") {
+        // 再次点击收起
+        panel.style.display = "none";
+        return;
+    }
+    panel.style.display = "block";
+    if (dpanel) dpanel.style.display = "none";
+    loadBookGroups();
+}
+
+// 移除书籍：展开确认面板，填入书名/作者（再次点击收起）
+function showDeletePanel() {
+    var panel = document.getElementById("bookDeletePanel");
+    if (!panel) {
+        return;
+    }
+    var gpanel = document.getElementById("bookGroupPanel");
+    if (panel.style.display === "block") {
+        panel.style.display = "none";
+        return;
+    }
+    var nameEl = document.getElementById("deleteBookName");
+    var authorEl = document.getElementById("deleteBookAuthor");
+    if (nameEl) nameEl.innerHTML = currentBookName || "-";
+    if (authorEl) authorEl.innerHTML = currentAuthor || "-";
+    var chk = document.getElementById("confirmDeleteCheck");
+    if (chk) chk.checked = false;
+    panel.style.display = "block";
+    if (gpanel) gpanel.style.display = "none";
+}
+
+// 勾选确认后执行删除
+function onConfirmDeleteChange() {
+    var chk = document.getElementById("confirmDeleteCheck");
+    if (chk && chk.checked) {
+        doDeleteBook();
+    }
+}
+
+// ===== 设置页「配置书籍」功能区：2×2 卡片 + 底部状态栏 =====
+// 后端无缓存大小(MB)接口，B 卡用缓存章节数占位；A 卡显示总章数 + 成功/失败(服务器缓存)。
+// 移出书架 = 二次确认（首次点击变「确认移出?」+ 状态栏提示，再次点击才真正删除），
+// 对应附件「再次点击「确认删除」以移除本书」的最后一行详细进度。
+var bookMgmtNeedShelfRefresh = false;
+var bookMgmtRemoveArmed = false;       // 移出书架是否已进入确认态
+var bookMgmtRemoveArmedUrl = "";       // 确认态针对哪一本书（换书自动解除）
+
+// 底部状态栏统一写入口
+function bmSetStatus(text) {
+    var el = document.getElementById("bmStatus");
+    if (el) { el.innerHTML = text; }
+}
+// 设状态栏文字并高亮（成功/失败样式与附件一致：纯黑文字）
+function bmStatus(text) {
+    bmSetStatus(text);
+}
+
+// 打开设置页时：填充书名/作者、总章数、缓存章数，复位确认态
+function initBookMgmt() {
+    var title = document.getElementById("bmBookTitle");
+    var author = document.getElementById("bmBookAuthor");
+    if (title) { title.innerHTML = currentBookName ? ("书名：" + currentBookName) : "（未打开书籍）"; }
+    if (author) { author.innerHTML = currentAuthor ? ("作者：" + currentAuthor) : "—"; }
+    // A 卡总章数（章节列表已加载则取长度）
+    var cnt = document.getElementById("bmCacheCount");
+    var total = bookChapterMapCache ? bookChapterMapCache.length : 0;
+    if (cnt) { cnt.innerHTML = total > 0 ? String(total) : "0"; }
+    // B 卡占用缓存章节数（无接口，沿用 A 卡可读值占位）
+    var sz = document.getElementById("bmClearSize");
+    if (sz) { sz.innerHTML = total > 0 ? String(total) : "0"; }
+    // 解除上一本书遗留的移出确认态
+    bookMgmtRemoveArmed = false;
+    bookMgmtRemoveArmedUrl = "";
+    var delBtn = document.querySelector('[data-bookmgmt="delete"]');
+    if (delBtn) { delBtn.innerHTML = "移出书架"; delBtn.className = "bm-card-btn bm-btn-dark"; }
+    bmSetStatus("各卡片操作结果");
+    // 打开设置页即预加载分组下拉框（不依赖点击按钮）
+    mgmtLoadGroups();
+}
+
+// 卡片按钮分派
+function setBookMgmtTab(tab) {
+    if (tab === "cache") { mgmtCacheBook(); }
+    else if (tab === "clear") { mgmtClearCache(); }
+    else if (tab === "move") { mgmtMoveToGroup(); }
+    else if (tab === "delete") { mgmtRemoveBook(); }
+}
+
+// 缓存书籍：SSE 进度流（老 Kindle 无 EventSource，用 XHR 逐段读）
+function mgmtCacheBook() {
+    if (!currentBookUrl) { bmStatus("请先打开一本书再操作"); return; }
+    bmStatus("正在提交服务器缓存任务…");
+    var cnt = document.getElementById("bmCacheCount");
+    var det = document.getElementById("bmCacheDetail");
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", url(cacheBookSSE, { url: currentBookUrl, count: 0, refresh: 0 }), true);
+    if (config.type == "multi") { xhr.withCredentials = true; }
+    function parseProgress(dst) {
+        var txt = xhr.responseText || "";
+        var lines = txt.split("\n");
+        var last = "";
+        for (var i = lines.length - 1; i >= 0; i--) {
+            if (lines[i].indexOf("data:") === 0) { last = lines[i].substring(5); break; }
+        }
+        if (!last) { return null; }
+        try { return JSON.parse(last); } catch (e) { return null; }
+    }
+    function render(o, done) {
+        if (!o) { return; }
+        if (cnt) { cnt.innerHTML = (o.cachedCount != null ? String(o.cachedCount) : "0"); }
+        if (det) { det.innerHTML = "成功 " + (o.successCount || 0) + " · 失败 " + (o.failedCount || 0) + " · 缓存"; }
+        bmStatus("已缓存 " + (o.cachedCount || 0) + " 章（成功 " + (o.successCount || 0) + "，失败 " + (o.failedCount || 0) + "）" + (done ? " · 完成" : ""));
+    }
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState === 3) { render(parseProgress(), false); }
+        else if (xhr.readyState === 4) {
+            if (xhr.status === 200) {
+                var o = parseProgress();
+                if (o) { render(o, true); }
+                else { bmStatus("服务器缓存完成"); }
+                // 缓存完成后同步 B 卡占用章节数
+                var sz = document.getElementById("bmClearSize");
+                var cnt2 = document.getElementById("bmCacheCount");
+                if (sz && cnt2) { sz.innerHTML = cnt2.innerHTML; }
+            } else {
+                bmStatus("缓存失败，请检查网络或书源");
+            }
+        }
+    };
+    xhr.onerror = function () { bmStatus("缓存失败，请检查网络"); };
+    xhr.send();
+}
+
+// 清除缓存：删除服务端整书缓存
+function mgmtClearCache() {
+    if (!currentBookUrl) { bmStatus("请先打开一本书再操作"); return; }
+    bmStatus("正在清除服务器缓存…");
+    HttpPost(url(deleteBookCache), { bookUrl: currentBookUrl }, function (res) {
+        if (res && res.isSuccess) {
+            bmStatus("已清除当前书籍缓存");
+            var sz = document.getElementById("bmClearSize");
+            if (sz) { sz.innerHTML = "0"; }
+            var cnt = document.getElementById("bmCacheCount");
+            if (cnt) { cnt.innerHTML = "0"; }
+            var det = document.getElementById("bmCacheDetail");
+            if (det) { det.innerHTML = "成功 0 · 失败 0 · 缓存"; }
+        } else {
+            bmStatus("清除失败" + (res && res.errorMsg ? "：" + res.errorMsg : ""));
+        }
+    });
+}
+
+// 移动书籍：读取已有分组填入下拉框
+function mgmtLoadGroups() {
+    var sel = document.getElementById("mgmtGroupSelect");
+    if (!sel) { return; }
+    sel.options.length = 0;
+    sel.options.add(new Option("未分组", "0"));
+    bmStatus("正在读取分组…");
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", url(getBookGroups), true);
+    if (config.type == "multi") { xhr.withCredentials = true; }
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState !== 4) { return; }
+        if (xhr.status === 200) {
+            var res = null;
+            try { res = JSON.parse(xhr.responseText); } catch (e) { res = null; }
+            var groups = (res && res.data && res.data.length) ? res.data : [];
+            for (var i = 0; i < groups.length; i++) {
+                var gid = parseInt(groups[i].groupId, 10);
+                if (isNaN(gid)) { gid = 0; }
+                sel.options.add(new Option(groups[i].groupName || ("分组" + gid), String(gid)));
+            }
+            bmStatus(groups.length ? "选择分组后点「移动分组」" : "暂无分组");
+        } else {
+            bmStatus("分组读取失败");
+        }
+    };
+    xhr.send();
+}
+
+// 点击「移动分组」按钮后执行（选择下拉框本身不触发）
+function mgmtMoveToGroup() {
+    var sel = document.getElementById("mgmtGroupSelect");
+    if (!sel || !currentBookUrl) { return; }
+    var gid = parseInt(sel.value, 10);
+    if (isNaN(gid)) { gid = 0; }
+    var groupName = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : "";
+    HttpPost(url(saveBookGroupId), { bookUrl: currentBookUrl, groupId: gid }, function (res) {
+        bmStatus((res && res.isSuccess) ? ("已移动到「" + groupName + "」") : "移动失败");
+    });
+}
+
+// 移出书架：二次确认。首次点击进入确认态（按钮变蓝 + 状态栏提示），再次点击执行删除。
+function mgmtRemoveBook() {
+    var btn = document.querySelector('[data-bookmgmt="delete"]');
+    if (!currentBookUrl) { bmStatus("请先打开一本书再操作"); return; }
+    // 换书自动解除确认态
+    if (bookMgmtRemoveArmedUrl && bookMgmtRemoveArmedUrl !== currentBookUrl) {
+        bookMgmtRemoveArmed = false;
+        bookMgmtRemoveArmedUrl = "";
+    }
+    if (!bookMgmtRemoveArmed) {
+        bookMgmtRemoveArmed = true;
+        bookMgmtRemoveArmedUrl = currentBookUrl;
+        if (btn) { btn.innerHTML = "确认移出?"; btn.className = "bm-card-btn bm-btn-confirm"; }
+        bmStatus("再次点击「确认移出」以移出本书");
+        return;
+    }
+    // 第二次点击：真正执行移出
+    bookMgmtRemoveArmed = false;
+    bookMgmtRemoveArmedUrl = "";
+    if (btn) { btn.innerHTML = "移出书架"; btn.className = "bm-card-btn bm-btn-dark"; }
+    bmStatus("正在移出「" + (currentBookName || "当前书籍") + "」…");
+    var params = {
+        refresh: 1,
+        url: currentBookUrl,
+        bookUrl: currentBookUrl,
+        origin: currentSourceUrl,
+        name: currentBookName,
+        author: currentAuthor
+    };
+    HttpPost(url(deleteBook), params, function (res) {
+        if (res && res.isSuccess) {
+            bookMgmtNeedShelfRefresh = true;
+            bmStatus("已移出「" + (currentBookName || "当前书籍") + "」");
+        } else {
+            bmStatus("移出失败" + (res && res.errorMsg ? "：" + res.errorMsg : ""));
+        }
+    });
+}
+
+// 缓存书籍到服务器（SSE 进度流；老 Kindle 无 EventSource，用 XHR 读流）
+function cacheCurrentBook() {
+    if (!currentBookUrl) {
+        var h0 = document.getElementById("bookManageHint");
+        if (h0) h0.innerHTML = "请先打开一本书";
+        return;
+    }
+    var hint = document.getElementById("bookManageHint");
+    if (hint) hint.innerHTML = "正在提交缓存任务…";
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", url(cacheBookSSE, { url: currentBookUrl, count: 0, refresh: 0 }), true);
+    if (config.type == "multi") {
+        xhr.withCredentials = true;
+    }
+    function parseProgress() {
+        var txt = xhr.responseText || "";
+        var lines = txt.split("\n");
+        var last = "";
+        for (var i = lines.length - 1; i >= 0; i--) {
+            if (lines[i].indexOf("data:") === 0) {
+                last = lines[i].substring(5);
+                break;
+            }
+        }
+        if (!last || !hint) return;
+        try {
+            var o = JSON.parse(last);
+            hint.innerHTML = "已缓存 " + o.cachedCount + " 章（成功 " + o.successCount + "，失败 " + o.failedCount + "）";
+        } catch (e) {}
+    }
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState === 3) {
+            parseProgress();
+        } else if (xhr.readyState === 4) {
+            if (xhr.status === 200) {
+                parseProgress();
+                if (hint) hint.innerHTML += " · 完成";
+            } else {
+                if (hint) hint.innerHTML = "缓存失败，请检查网络或书源";
+            }
+        }
+    };
+    xhr.onerror = function () {
+        if (hint) hint.innerHTML = "缓存失败，请检查网络";
+    };
+    xhr.send();
+}
+
+// 选择分组后即时生效：不需要确认按钮，也不弹「已移动到X组」提示。
+function moveBookToGroup() {
+    var sel = document.getElementById("bookGroupSelect");
+    if (!sel || !currentBookUrl) {
+        return;
+    }
+    var gid = parseInt(sel.value, 10);
+    if (isNaN(gid)) {
+        gid = 0;
+    }
+    var params = {
+        bookUrl: currentBookUrl,
+        groupId: gid
+    };
+    HttpPost(url(saveBookGroupId), params, function (res) {
+        if (res && res.isSuccess) {
+            // 静默生效：收起移动面板，不弹 alert、不显示成功文字
+            var panel = document.getElementById("bookGroupPanel");
+            if (panel) {
+                panel.style.display = "none";
+            }
+        }
+        // 失败时保持静默，避免打断阅读
+    });
 }
 
 // 处理书源列表显示，书源路径不等同于书籍路径
@@ -1954,7 +2439,7 @@ function setReadSource(bookName, newBookUrl, oldBookUrl, newSourceUrl, oldSource
     }
 }
 
-function deleteBookItem() {
+function doDeleteBook() {
     var params = {
         refresh: 1,
         url: currentBookUrl,
@@ -1979,6 +2464,7 @@ function deleteBookItem() {
 function initCSSLoadStyle() {
     hide(".c_bookshelf");
     hide(".c_bookContent");
+    hide(".bookSourceList");
     hide(".menu");
 
     hide("#topMenu");
@@ -2039,7 +2525,8 @@ function handleEnterKey() {
     // 检查哪个模态框可见
     var fontConfig = $('.font-config');
     if (fontConfig && fontConfig.style.display === 'block') {
-        refreshConfig();
+        // 设置项已即时生效，回车只做一次应用，不再关闭弹窗
+        applyConfigLive();
         return;
     }
     
@@ -2232,13 +2719,17 @@ function applyFontSettings(targetPageNo) {
     var fontWeight = config.fontWeight;
 
     // 字体映射表
+    // 短名映射：下拉框显示名 = 配置项的值；保留旧名映射仅为兼容历史配置
     var fontFamilyMap = {
-        'system': 'system',
-        '世间美好': '"世间美好", system',
-        '御风楷体': '"御风楷体", system',
+        '系统': 'system',
+        '云朵': '"云朵字体", system',
+        '圆体': '"糯米圆体", system',
+        '楷体': '"御风楷体", system',
+        '系统默认': 'system',
         '云朵字体': '"云朵字体", system',
         '糯米圆体': '"糯米圆体", system',
-        '方正品尚': '"方正品尚", system'
+        '御风楷体': '"御风楷体", system',
+        'system': 'system'
     };
     
     var appliedFontFamily = fontFamilyMap[fontFamily] || 'system';
@@ -2275,14 +2766,16 @@ function applyFontSettings(targetPageNo) {
     }
 }
 
-//临时配置
-function refreshConfig() {
-    // 更新字体配置
+// 设置项即时生效：选定即应用，不关闭设置弹窗
+function applyConfigLive() {
     updateFontConfig();
-    // 直接应用字体设置
     applyFontSettings(currentBookPage);
-    // 更新翻页选项状态（确保与当前设置一致）
     changePageFunNum();
+}
+
+//临时配置（「完成」按钮：应用并关闭弹窗；选项本身已通过 change 即时生效）
+function refreshConfig() {
+    applyConfigLive();
     hide(".font-config");
 }
 
@@ -2364,21 +2857,51 @@ function initBookElement() {
     sourceColumn2 = document.getElementById("sourceColumn2");
 }
 
+// 禁止输入框聚焦时页面被自动放大（Kindle / 老 WebKit 的 form-control auto zoom）。
+// 关键手段是 CSS 的 -webkit-text-size-adjust:none（老内核唯一可靠值）。
+// 这里只做两件低风险的事：阻止双指缩放手势；聚焦后把滚动位置归零。
+// 不再在 focus/blur 时反复 setAttribute viewport —— 那会触发 viewport 重算，
+// 反而可能造成页面跳动/放大（Kindle 上尤其明显）。
+// Kindle 浏览器会在输入框聚焦时自行放大页面且无视 maximum-scale。
+// 策略：聚焦时不干预（避免打断输入），失焦/resize/首屏后主动重写 viewport 复位缩放。
+// 缩放复位：不再改写 viewport meta。
+// 老 Kindle WebKit 一旦发现 viewport 的 content 被脚本改动，会整条重新解析并重置缩放状态，
+// 表现为「点输入框/点设置后页面变大」，而且会和 resize 互相触发。原版（未适配前）从不改 viewport，
+// 所以没有这个问题——这里只保留函数名做空实现，兼容既有调用点。
+function forceViewportScale() {
+    return;
+}
+
+// 复位整页缩放：重新挂一次 viewport meta，让浏览器按 initial-scale=1 重新校准。
+// 老 Kindle 聚焦输入框时会自行放大（约 1.6 倍）并且失焦后不会自己缩回，
+// 放大状态还会一路带到阅读页——表现为「顶部被切、一页字数变少」。
+// 这里只在失焦 / 切换界面时调用，聚焦期间不做任何事，不打断输入。
+function resetViewportScale() {
+    // r22 回退：还原原始代码「不干预 viewport」的行为。
+    // 原始代码聚焦输入框本就无放大问题；此复位是后期引入的 hack，已停用。
+    return;
+}
+
+function initInputZoomGuard() {
+    // r22 回退：还原原始代码「不干预聚焦缩放」的行为，空实现仅为兼容调用点。
+    return;
+}
+
 function initEventListeners() {
     // 登录按钮
     var loginBtn = document.querySelector('[data-action="login"]');
     if (loginBtn) {
         loginBtn.addEventListener('click', login);
     }
+    // 登录卡片底部「注册 / 登录」模式切换
+    var toggleLoginModeBtn = document.querySelector('[data-action="toggleLoginMode"]');
+    if (toggleLoginModeBtn) {
+        toggleLoginModeBtn.addEventListener('click', toggleLoginMode);
+    }
     // 书架按钮
     var bookshelfBtn = document.querySelector('[data-action="getBookshelf"]');
     if (bookshelfBtn) {
         bookshelfBtn.addEventListener('click', getBookshelf);
-    }
-    // 书源按钮
-    var sourceBtn = document.querySelector('[data-action="showSourceList"]');
-    if (sourceBtn) {
-        sourceBtn.addEventListener('click', showSourceList);
     }
     // 注销按钮
     var logoutBtn = document.querySelector('[data-action="logout"]');
@@ -2390,17 +2913,42 @@ function initEventListeners() {
     if (chapterBtn) {
         chapterBtn.addEventListener('click', showChapterList);
     }
-    // 设置按钮
+    // 设置按钮：打开前重新同步一次输入框显示值（选项已改为即时生效）
     var configBtn = document.querySelector('[data-action="show"][data-target=".font-config"]');
     if (configBtn) {
         configBtn.addEventListener('click', function() {
+        initCSSLoadValue();
+        initBookMgmt();
         show(this.getAttribute('data-target'));
+        // 弹窗显示后才能量到真实宽度：立刻量一次，等老内核完成重排再量一次
+        alignFontBox();
+        setTimeout(alignFontBox, 120);
+        setTimeout(alignFontBox, 400);
     });
     }
-    // 字体配置确定按钮
-    var refreshConfigBtn = document.querySelector('[data-action="refreshConfig"]');
-    if (refreshConfigBtn) {
-        refreshConfigBtn.addEventListener('click', refreshConfig);
+    // 关于本机入口：打开前刷新一次信息（缩放等读数随视口变化，保证每次看到的是最新的）
+    var aboutEntry = document.querySelector('.about-entry');
+    if (aboutEntry) {
+        aboutEntry.addEventListener('click', function () {
+            updateDeviceInfo();
+            show(this.getAttribute('data-target'));
+        }, false);
+    }
+    // 设置项已即时生效，「完成」按钮已移除；关闭请点右上角 ×
+    // 设置项选定即生效：无需再点「完成」按钮
+    var liveIds = ['fontFamily', 'contentFontSize', 'letterSpacing', 'lineHeight', 'contentFontWight'];
+    for (var li = 0; li < liveIds.length; li++) {
+        var liveEl = document.getElementById(liveIds[li]);
+        if (liveEl) {
+            liveEl.addEventListener('change', function () {
+                applyConfigLive();
+                alignFontBox();
+            });
+        }
+    }
+    var pageRadios = document.querySelectorAll('input[name="changePageFunNum"]');
+    for (var ri = 0; ri < pageRadios.length; ri++) {
+        pageRadios[ri].addEventListener('change', applyConfigLive);
     }
     // 目录刷新按钮
     var refreshChapterBtn = document.querySelector('[data-action="getChapterList"]');
@@ -2423,45 +2971,57 @@ function initEventListeners() {
             jumpChapterList(1);
         });
     }
-    // 更多书源按钮
-    var moreSourceBtn = document.querySelector('[data-action="getSourceList"]');
-    if (moreSourceBtn) {
-        moreSourceBtn.addEventListener('click', function() {
-            var args = this.getAttribute('data-args');
-            if (args) {
-                var argArray = args.split(',');
-                getSourceList(currentSourcePage+1, sourcePageSize, true);
-            }
-        });
-    }
-
-    // 书源上一页按钮
-    var prevSourcePageBtn = document.querySelector('[data-action="prevSourcePage"]');
-    if (prevSourcePageBtn) {
-        prevSourcePageBtn.addEventListener('click', function() {
-            jumpSourcePage(-1);
-        });
-    }
-    
-    // 书源下一页按钮
-    var nextSourcePageBtn = document.querySelector('[data-action="nextSourcePage"]');
-    if (nextSourcePageBtn) {
-        nextSourcePageBtn.addEventListener('click', function() {
-            jumpSourcePage(1);
-        });
-    }
-    
-    // 移除书籍按钮
+    // 移除书籍按钮（书源切换按钮已停用：更多书源 / 上一页 / 下一页）
     var deleteBookBtn = document.querySelector('[data-action="deleteBookItem"]');
     if (deleteBookBtn) {
-        deleteBookBtn.addEventListener('click', deleteBookItem);
+        deleteBookBtn.addEventListener('click', showDeletePanel);
+    }
+    var confirmDeleteChk = document.getElementById("confirmDeleteCheck");
+    if (confirmDeleteChk) {
+        confirmDeleteChk.addEventListener('change', onConfirmDeleteChange);
+    }
+    var cacheBookBtn = document.querySelector('[data-action="cacheBookItem"]');
+    if (cacheBookBtn) {
+        cacheBookBtn.addEventListener('click', cacheCurrentBook);
+    }
+    // 移动书籍：展开分组面板；选择分组即时生效
+    var moveBookBtn = document.querySelector('[data-action="moveBookItem"]');
+    if (moveBookBtn) {
+        moveBookBtn.addEventListener('click', showMoveBookPanel);
+    }
+    var groupSel = document.getElementById("bookGroupSelect");
+    if (groupSel) {
+        groupSel.addEventListener('change', moveBookToGroup);
+    }
+    // 设置页：书籍管理功能区（四个按钮 + 分组下拉 + 删除勾选）
+    var mgmtBtns = document.querySelectorAll('[data-bookmgmt]');
+    for (var mi = 0; mi < mgmtBtns.length; mi++) {
+        mgmtBtns[mi].addEventListener('click', function () {
+            setBookMgmtTab(this.getAttribute('data-bookmgmt'));
+        });
+    }
+    var mgmtSel = document.getElementById("mgmtGroupSelect");
+    if (mgmtSel) {
+        // 选择分组不立即生效：仅提示，须点击「移动分组」按钮才执行
+        mgmtSel.addEventListener('change', function () {
+            bmStatus("已选分组，点「移动分组」生效");
+        });
     }
     
     // 所有关闭按钮 - 使用兼容的循环
     var hideButtons = document.querySelectorAll('[data-action="hide"]');
     for (var i = 0; i < hideButtons.length; i++) {
         hideButtons[i].addEventListener('click', function() {
-            hide(this.getAttribute('data-target'));
+            var tgt = this.getAttribute('data-target');
+            hide(tgt);
+            // 移出过书籍：等用户关掉设置页再刷新书架，避免打断查看移出结果
+            if (tgt === ".font-config" && bookMgmtNeedShelfRefresh) {
+                bookMgmtNeedShelfRefresh = false;
+                bookMgmtRemoveArmed = false;
+                bookMgmtRemoveArmedUrl = "";
+                bmSetStatus("各卡片操作结果");
+                getBookshelf();
+            }
         });
     }
 }
@@ -2480,6 +3040,8 @@ function load() {
     initPageOptions();
     // 事件监听器函数
     initEventListeners();
+    // 禁止输入框聚焦时页面被自动放大
+    initInputZoomGuard();
     //初始化统一的事件处理器
     initEventHandlers();
     //统一的键盘事件处理
@@ -2493,6 +3055,8 @@ function load() {
 // 检查登录状态并切换界面
 function checkLoginState() {
       if (accessToken) {
+        // 登录成功后复位一次缩放：避免在登录框里被浏览器放大后，放大状态被带进书架/阅读页
+        resetViewportScale();
         hide(".c_login");
         show(".c_bookshelf");
         show(".menu");
@@ -2502,6 +3066,13 @@ function checkLoginState() {
         show(".c_login");
         hide(".c_bookshelf");
         hide(".c_bookContent");
+        // 书籍管理与书架管理一样，未登录时隐藏：
+        // .bookSourceList 是顶层模态框(z-index 1100)，高于登录界面(1000)，不显式关闭会穿透登录页；
+        // #topMenu 内含书籍管理入口按钮，一并隐藏，避免未登录触达管理功能。
+        hide(".bookSourceList");
+        hide("#topMenu");
+        hide("#bottomMenu");
+        menusVisible = false;
         return false;
     }
 }
@@ -2615,7 +3186,7 @@ function loginBookshelf() {
         config.password = $("#password").value;
 
         var params = {
-                isLogin: true,
+                isLogin: (loginMode !== "register"),
                 username: config.username,
                 password: decode(config.password),
                 code: ""
@@ -2628,7 +3199,7 @@ function loginBookshelf() {
             } else {
                 show("#login");
                 accessToken = null;
-                alert(res ? res.errorMsg : "登录失败");
+                alert(res ? res.errorMsg : (loginMode === "register" ? "注册失败" : "登录失败"));
             }
             loadingOver();
         });
@@ -2644,6 +3215,10 @@ function updateLoginConfig(){
 }
 
 function login() {
+    // 点「登录」时先把被浏览器放大的整页缩回 1:1：
+    // 老 Kindle 聚焦输入框后会一直停在放大状态，若不在这里复位，
+    // 放大会被原封不动地带进书架和阅读页（表现为正文顶部被切、一页字数变少）。
+    resetViewportScale();
     // 页面值获取
     updateLoginConfig();
     // 登录书架
@@ -2737,5 +3312,71 @@ document.addEventListener('DOMContentLoaded', function() {
     //debugBrowserInfo();
     // 加载应用
     load();
+    updateDeviceInfo();
+    // 缩放/横竖屏/地址栏收起都会改视口，这里同步刷新设备信息（只读，不干预布局）
+    window.addEventListener('resize', function () {
+        updateDeviceInfo();
+        alignFontBox();
+    }, false);
 
 });
+
+/* 设置页「设备信息」区：常驻显示，用来确认三件事
+   1) Kindle 强缓存有没有骗人——前端版本号是否为自己刚装的这版；
+   2) 页面到底跑在什么视口下（视口 vs 屏幕 的差就是浏览器 UI 占掉的高度）；
+   3) 有没有被整页放大——「缩放」一栏 = 布局宽度 / 可视宽度，正常是 100%，
+      点输入框被放大后会大于 100%，这样不用猜也能判断问题在浏览器还是页面。 */
+function updateDeviceInfo() {
+    function setText(id, text) {
+        var el = document.getElementById(id);
+        if (el) { el.innerHTML = text; }
+    }
+    // 前端资源版本：从 css 的 ?v= 参数取，构建时由 build.sh 注入
+    var tag = '';
+    var links = document.querySelectorAll('link');
+    var i, href;
+    for (i = 0; i < links.length; i++) {
+        href = links[i].getAttribute('href') || '';
+        if (href.indexOf('?v=') >= 0) {
+            tag = href.substring(href.indexOf('?v=') + 3);
+            break;
+        }
+    }
+    // r43) 应用版本：优先前端代码内明确版本号 frontVersion（构建注入），回退 CSS ?v=
+    var frontVer = (window.__XREAD_CONFIG__ && window.__XREAD_CONFIG__.frontVersion) || "";
+    setText('devVersion', frontVer ? ('v' + frontVer) : (tag ? ('v' + tag) : '开发预览'));
+
+    // 服务端版本：构建时由 build.sh 从后端 Cargo.toml 读取真实版本注入 appVersion
+    // （即后端 Rust 二进制版本 1.0.48，与发布包版本无关，后端代码不更新）
+    var cfg = window.__XREAD_CONFIG__ || {};
+    setText('devServerVersion', cfg.appVersion ? ('v' + cfg.appVersion) : '—');
+
+    var sw = (window.screen && screen.width) ? screen.width : 0;
+    var sh = (window.screen && screen.height) ? screen.height : 0;
+    setText('devScreen', sw + '×' + sh);
+
+    var vw = window.innerWidth || 0;
+    var vh = window.innerHeight || 0;
+    setText('devViewport', vw + '×' + vh);
+
+    var dpr = window.devicePixelRatio || 1;
+    setText('devDpr', String(Math.round(dpr * 1000) / 1000));
+
+    // 布局视口宽度不受整页缩放影响，可视宽度会——两者之比即当前缩放
+    var layoutW = document.documentElement.clientWidth || vw;
+    var zoom = vw ? Math.round(layoutW / vw * 1000) / 10 : 100;
+    setText('devZoom', zoom + '%' + (zoom > 101 ? '（页面被放大）' : ''));
+}
+
+/* 让「字体」下拉框与右侧「字号」输入框外框严格等宽。
+   原因：老 Kindle WebKit 的 <select> 不遵守 box-sizing:border-box，
+   CSS 里写多少 px 只是内容宽，实际外框还要加内边距和边框，所以总比 input 长一点点。
+   这里不再依赖盒模型假设，直接拿两个元素的实际 offsetWidth 做差，迭代修正 2~3 次，
+   任何内核都能对齐到像素级；若内核根本不接受 width（极端情况），最多 3 次后放弃，不会死循环。 */
+function alignFontBox() {
+    // r21：宽度回归 r5 真机验证写法——#fontFamily 用 184px content-box（外框 200px），
+    // input.number-input 用 200px border-box（外框 200px），两者纯 CSS 即精确对齐。
+    // 任何 JS 运行时宽度篡改（r19 的 offsetWidth 迭代）在老内核 WebKit 534 上都帮倒忙，
+    // 故彻底停用；保留空函数仅为兼容既有调用点。
+    return;
+}

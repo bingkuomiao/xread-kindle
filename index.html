@@ -5,13 +5,41 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
     <meta name="viewport"
           content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,minimal-ui,viewport-fit=cover"/>
+    <!-- PWA 全屏元信息（对齐上游 XRead）：iPhone 添加到主屏幕后隐藏地址栏/工具栏 -->
+    <meta name="theme-color" content="#ffffff"/>
+    <meta name="color-scheme" content="light"/>
+    <meta name="msapplication-navbutton-color" content="#ffffff"/>
+    <meta name="mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+    <meta name="apple-mobile-web-app-title" content="阅读"/>
+    <!-- r39-3) 非 Kindle 浏览器标记：PC/手机浏览器统一复用 other.css 的紧凑适配。
+         Kindle PW7(userAgent 含 armv7l+AppleWebKit/534)不加 class，走 kindle.css 原样。 -->
+    <script type="application/javascript">
+    (function () {
+        var ua = navigator.userAgent || "";
+        // 与 isKindleBrowser() 真机检测对齐，并覆盖更多 Kindle UA 变体；
+        // 宁可漏加 class（Kindle 走原样），绝不误加（老内核不兼容新 CSS）。
+        var isKindle = ua.indexOf("Kindle") !== -1 || ua.indexOf("Silk") !== -1 ||
+                       ua.indexOf("KFAP") !== -1 ||
+                       (ua.indexOf("armv7l") !== -1 && ua.indexOf("AppleWebKit/534") !== -1) ||
+                       (ua.indexOf("Linux armv7l") !== -1 && ua.indexOf("Safari/534.26") !== -1);
+        if (!isKindle) {
+            var el = document.documentElement;
+            el.className = (el.className ? el.className + " " : "") + "xread-browser";
+        }
+    })();
+    </script>
     <!--强制清除缓存-->
     <meta http-equiv="cache-control" content="no-cache"/>
     <meta http-equiv="Pragma" content="no-cache"/>
     <meta http-equiv="expires" content="0"/>
     <title>阅读</title>
+    <link rel="icon" type="image/png" href="img/favicon.png">
     <link rel="icon" href="img/favicon.ico">
     <link rel="stylesheet" href="css/kindle.css"/>
+    <link rel="stylesheet" href="css/other.css"/>
+    <script type="application/javascript">window.__XREAD_CONFIG__ = {"secure":true,"appVersion":"1.0.48","frontVersion":"1.0.48.69","debug":"off"};</script>
     <!-- 引入配置文件 -->
     <script type="application/javascript" src="js/config.js"></script>
 </head>
@@ -27,43 +55,48 @@
         </div>
         <form role="form" class="login-content">
             <div class="form-group">
-                <div class="form-row">
-                    <label for="type" class="form-label">类型 </label>
-                <div class="input-wrapper">
-                    <select class="form-control" id="type">
-                        <option value="multi">服务器多用户</option>
-                        <option value="single">服务器单用户</option>
-                        <option value="app">手机应用</option>
-                    </select>
-                </div>
+                <!-- 「类型」「地址」不再显示（fpk 版定制）：
+                     类型直接取 fpk 安装向导的「多用户鉴权 (SECURE)」——开启=服务器多用户(multi)，
+                     关闭=服务器单用户(single)，由 head 中 window.__XREAD_CONFIG__.secure 注入；
+                     地址自动取「加载本页面的源」，无需手填 IP:端口。
+                     保留两个隐藏字段仅为兼容既有读取逻辑 initCSSLoadValue() / updateLoginConfig()。 -->
+                <input type="hidden" id="type" value="multi"/>
+                <input type="hidden" id="address" value=""/>
+
+                <!-- 顶部 logo：用 PNG 图片（老 Kindle WebKit 对 <img> 支持最好，
+                     不用 SVG / CSS 绘图 / 字体图标，避免兼容问题） -->
+                <div class="login-logo-wrap">
+                    <img src="img/login-logo.png" alt="阅读" class="login-logo">
                 </div>
 
-                <div class="form-row">
-                    <label for="address" class="form-label">地址 </label>
-                    <div class="input-wrapper">
-                        <input type="text" class="form-control" id="address" placeholder="http://服务器地址:端口" autocomplete="url"/>
-                    </div>
-                </div>
+                <!-- 标题与说明文字；点击底部「注册」时由 JS 就地改文字（不替换元素，保证事件仍有效） -->
+                <h1 class="login-title" id="loginTitle">登录</h1>
+                <p class="login-subtitle" id="loginSubtitle">登录以同步你的阅读数据</p>
 
                 <div class="serverSecured">
-                    <div class="form-row">
-                        <label for="username" class="form-label">用户 </label>
-                    <div class="input-wrapper">
-                        <input type="text" class="form-control" id="username" placeholder="请输入用户名" autocomplete="username"/>
+                    <div class="form-row login-field">
+                        <label for="username" class="login-field-label">用户名</label>
+                        <div class="login-field-input">
+                            <input type="text" class="form-control" id="username" placeholder="请输入用户名" autocomplete="username"/>
                         </div>
                     </div>
 
-                    <div class="form-row">
-                        <label for="password" class="form-label">密码 </label>
-                    <div class="input-wrapper">
-                        <input type="password" class="form-control" id="password" placeholder="请输入密码" autocomplete="current-password"/>
+                    <div class="form-row login-field">
+                        <label for="password" class="login-field-label">密码</label>
+                        <div class="login-field-input">
+                            <input type="password" class="form-control" id="password" placeholder="请输入密码" autocomplete="current-password"/>
                         </div>
                     </div>
                 </div>
 
+                <!-- 登录按钮：转圈动画已取消（loading.gif 不再引入，loading()/loadingOver() 改为空实现） -->
                 <div class="button-group">
-                    <button type="button" class="btn-primary" data-action="login">登录</button>
-                    <img id="logining" class="login-loading" src="img/loading.gif">
+                    <button type="button" class="btn-primary login-submit" id="loginSubmit" data-action="login">登录</button>
+                </div>
+
+                <div class="login-footer">
+                    <span class="login-footer-text" id="loginFooterText">没有账号？</span>
+                    <span class="login-footer-link" id="loginToggle" data-action="toggleLoginMode">注册</span>
                 </div>
             </div>
         </form>
@@ -79,10 +112,7 @@
         </div>
 
         <div class="top-menu-middle">
-            <div class="icon-button" data-action="showSourceList">
-                <img src="img/source.png" alt="书源" class="menu-icon">
-                <span class="menu-text">书源</span>
-            </div>
+            <!-- 书源按钮已移除：当前后端不支持书源切换 -->
         </div>
 
         <div class="top-menu-right">
@@ -137,18 +167,17 @@
         <span class="close" data-action="hide" data-target=".font-config">&times;</span>
         <form role="form" class="config-content">
             <!-- 字体样式设置区域 -->
-            <h2>配置字体</h2>
+            <h2><span class="sec-no">01</span>配置字体</h2>
             <div class="form-row">
-            <label for="font-config" class="form-label">字体：</label>
+            <label for="font-config" class="form-label">字体</label>
             <div class="input-wrapper">
                 <div class="font-selector">
+                    <!-- 只保留 4 种字体并使用短名，短名即显示名、也是配置项的值 -->
                     <select id="fontFamily" class="form-control">
-                        <option>系统默认</option>
-                        <option>世间美好</option>
-                        <option>云朵字体</option>
-                        <option>糯米圆体</option>
-                        <option>御风楷体</option>
-                        <option>方正品尚</option>
+                        <option>系统</option>
+                        <option>云朵</option>
+                        <option>圆体</option>
+                        <option>楷体</option>
                     </select>
                     <div class="bold-control">
                         <input type="checkbox" id="contentFontWight" class="checkbox-control">
@@ -159,32 +188,30 @@
             </div>
 
             <div class="form-row">
-            <label for="font-config" class="form-label">字号：</label>
+            <label for="font-config" class="form-label">字号</label>
             <div class="input-wrapper">
                 <input type="number" id="contentFontSize" value="" class="form-control number-input">
                 </div>
             </div>
 
             <div class="form-row">
-            <label for="font-config" class="form-label">字距：</label>
+            <label for="font-config" class="form-label">字距</label>
             <div class="input-wrapper">
                 <input type="number" id="letterSpacing" value="" class="form-control number-input">
                 </div>
             </div>
 
             <div class="form-row">
-            <label for="font-config" class="form-label">行距：</label>
+            <label for="font-config" class="form-label">行距</label>
             <div class="input-wrapper">
                 <input type="number" id="lineHeight" value="" step="0.1" class="form-control number-input">
                 </div>
             </div>
             
             <!-- 翻页方式区域 -->
-            <h2>配置翻页</h2>
+            <h2><span class="sec-no">02</span>配置翻页</h2>
             <div class="page-turning-section">
                 <div class="form-row">
-                <label for="font-config" class="form-label">翻页：</label>
-
                 <div class="page-turning-content-cell">
                     <div class="page-turning-options">
                         <div class="page-option">
@@ -216,13 +243,78 @@
                 </div>
             </div>
 
-            <!-- 确定按钮 -->
-            <div class="button-group">
-                <button type="button" class="btn-primary" data-action="refreshConfig">确定</button>
+            <!-- ===== 配置书籍：2×2 卡片布局 + 底部统一状态栏（参考附件设计） ===== -->
+            <h2><span class="sec-no">03</span>配置书籍</h2>
+            <div class="book-mgmt-section">
+                <div class="bm-cards">
+                 <div class="bm-card-row">
+                    <!-- A 缓存书籍：章数 + 成功/失败，强调服务器缓存 -->
+                    <div class="bm-card">
+                        <div class="bm-card-hd"><span class="bm-card-id">A</span><span class="bm-card-title">缓存书籍</span></div>
+                        <div class="bm-card-value"><span id="bmCacheCount">0</span><span class="bm-card-unit">章（服务器）</span></div>
+                        <div id="bmCacheDetail" class="bm-card-note">成功 0 · 失败 0 · 缓存</div>
+                        <button type="button" class="bm-card-btn bm-btn-dark" data-bookmgmt="cache">缓存全书</button>
+                    </div>
+                    <!-- B 清除缓存：服务器缓存占用（后端无大小接口，显示缓存章节），强调服务器缓存 -->
+                    <div class="bm-card">
+                        <div class="bm-card-hd"><span class="bm-card-id">B</span><span class="bm-card-title">清除缓存</span></div>
+                        <div class="bm-card-value"><span id="bmClearSize">0</span><span class="bm-card-unit">章（服务器）</span></div>
+                        <div class="bm-card-note">当前书籍已占用缓存</div>
+                        <button type="button" class="bm-card-btn bm-btn-dark" data-bookmgmt="clear">立即清除</button>
+                    </div>
+                 </div>
+                 <div class="bm-card-row">
+                    <!-- C 移动书籍：分组下拉 + 说明 -->
+                    <div class="bm-card">
+                        <div class="bm-card-hd"><span class="bm-card-id">C</span><span class="bm-card-title">移动书籍</span></div>
+                        <select id="mgmtGroupSelect" class="bm-card-select"></select>
+                        <div class="bm-card-note">选择分组后点此按钮</div>
+                        <button type="button" class="bm-card-btn bm-btn-dark" data-bookmgmt="move">移动分组</button>
+                    </div>
+                    <!-- D 移出书架：书名 + 作者 + 警示，二次确认按钮 -->
+                    <div class="bm-card">
+                        <div class="bm-card-hd"><span class="bm-card-id">D</span><span class="bm-card-title">移出书架</span></div>
+                        <div id="bmBookTitle" class="bm-book-title">—</div>
+                        <div id="bmBookAuthor" class="bm-book-author">—</div>
+                        <div class="bm-card-note">移出不可恢复，谨慎操作</div>
+                        <button type="button" class="bm-card-btn bm-btn-dark" data-bookmgmt="delete">移出书架</button>
+                    </div>
+                 </div>
+                </div>
+                <!-- 底部统一状态栏 + 关于本机：同一行（左状态、右关于本机），共用一条上边框 -->
+                <div class="bm-status-row">
+                    <div class="bm-status-bar">
+                        <span class="bm-status-check">✓</span>
+                        <span id="bmStatus" class="bm-status-text">各卡片操作结果</span>
+                    </div>
+                    <div class="about-entry" data-action="show" data-target=".about-modal">关于本机</div>
+                </div>
             </div>
+
+            <!-- 设置项选择即时生效；关闭请点右上角 × -->
         </form>
     </div>
 </div>
+
+<!--关于本机弹窗：圆角卡片 + 左对齐信息行，参考 Kindle 系统「设备信息」弹窗-->
+<div class="about-modal modal">
+    <div class="about-content">
+        <span class="about-close" data-action="hide" data-target=".about-modal">&times;</span>
+        <h1 class="about-heading">关于本机</h1>
+        <div class="about-list">
+            <div class="about-row"><span class="about-label">设备名称</span><span class="about-value">Kindle Paperwhite（第七代）</span></div>
+            <div class="about-row"><span class="about-label">固件版本</span><span class="about-value">Kindle 5.16.2.1.1</span></div>
+            <div class="about-row"><span class="about-label">应用版本</span><span class="about-value" id="devVersion">—</span></div>
+            <div class="about-row"><span class="about-label">服务端版本</span><span class="about-value" id="devServerVersion">—</span></div>
+            <div class="about-row"><span class="about-label">屏幕</span><span class="about-value" id="devScreen">—</span></div>
+            <div class="about-row"><span class="about-label">视口</span><span class="about-value" id="devViewport">—</span></div>
+            <div class="about-row"><span class="about-label">像素比</span><span class="about-value" id="devDpr">—</span></div>
+            <div class="about-row"><span class="about-label">缩放</span><span class="about-value" id="devZoom">—</span></div>
+        </div>
+        <div class="about-footnote">XRead · Kindle 版</div>
+    </div>
+</div>
+
 
 <div class="white modal">
     <div id="debug" style="background-color: white; font-size: 15px;"></div>
@@ -257,30 +349,52 @@
     </div>
 </div>
 
-<!--书源模态框-->
+<!--书籍管理模态框（由原书源切换弹窗改造）
+    当前后端不支持书源切换：去掉「更多书源」「上一页」「下一页」与书源列表，
+    保留书名 +「移动书籍」+「移除书籍」+ 关闭。
+    「移动书籍」复用后端已有分组接口 getBookGroups / saveBookGroupId，
+    把当前书籍的 group 设为选定分组 id（0 = 未分组）。
+    注意：sourceColumn1 / sourceColumn2 两个节点必须保留 —— freshBookCache() 与
+    initBookElement() 会读写它们，直接删除会在打开书籍时抛 null 异常。
+    这里用 .book-source-hidden 隐藏列表，JS 侧不再发起书源请求。 -->
 <div class="bookSourceList modal">
     <div class="modal-content">
         <span class="close" data-action="hide" data-target=".bookSourceList">&times;</span>
         <div class="modal-title-container">
-            <h1 id="sourceTitle">书名</h1> 
-            <img id="sourcing" class="source-loading" src="img/loading.gif"> 
+            <h1 id="sourceTitle">书名</h1>
+            <img id="sourcing" class="source-loading" src="img/loading.gif">
         </div>
-        <div id="sourceNameList" class="modal-list">
+        <div id="sourceNameList" class="modal-list book-source-hidden">
             <div class="modal-columns-container">
                 <div class="modal-column" id="sourceColumn1"></div>
                 <div class="modal-column" id="sourceColumn2"></div>
             </div>
         </div>
         <div class="modal-menu">
-            <div class="modal-menu-left">
-                <button data-action="getSourceList" data-args="0,lastSourceIndex,showSourceListNum,true">更多书源</button>
-                <button data-action="prevSourcePage">上一页</button>
-            </div>
-
-            <div class="modal-menu-right">
-                <button data-action="nextSourcePage">下一页</button>
+            <div class="modal-menu-bookmanage">
+                <button data-action="cacheBookItem">缓存书籍</button>
+                <button data-action="moveBookItem">移动书籍</button>
                 <button data-action="deleteBookItem">移除书籍</button>
             </div>
+        </div>
+        <!-- 通用提示（缓存进度等） -->
+        <div id="bookManageHint" class="book-manage-hint"></div>
+        <!-- 移动书籍面板：点「移动书籍」展开，再点收起；选择分组即即时生效 -->
+        <div id="bookGroupPanel" class="book-group-panel">
+            <div class="book-group-title">移动到分组</div>
+            <div class="book-group-row">
+                <select id="bookGroupSelect" class="form-control"></select>
+            </div>
+            <div id="bookGroupHint" class="book-group-hint"></div>
+        </div>
+        <!-- 移除书籍面板：点「移除书籍」展开，显示书名/作者，勾选后确认删除 -->
+        <div id="bookDeletePanel" class="book-delete-panel">
+            <div class="book-delete-title">确认移除以下书籍</div>
+            <div class="book-delete-info">书名：<span id="deleteBookName"></span></div>
+            <div class="book-delete-info">作者：<span id="deleteBookAuthor"></span></div>
+            <label class="book-delete-check">
+                <input type="checkbox" id="confirmDeleteCheck"/> 勾选后确认移除
+            </label>
         </div>
     </div>
 </div>

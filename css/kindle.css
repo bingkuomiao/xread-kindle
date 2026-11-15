@@ -20,20 +20,6 @@
     font-style: normal;
 }
 
-@font-face {
-    font-family: "世间美好";
-    src: url('../fonts/ShiJianMeiHao.woff') format('woff');
-    font-weight: normal;
-    font-style: normal;
-}
-
-@font-face {
-    font-family: "方正品尚";
-    src: url('../fonts/FangZhengPinShang.woff') format('woff');
-    font-weight: normal;
-    font-style: normal;
-}
-
 :root {
     height: 100vh; /* 使用视口高度 */
 }
@@ -96,14 +82,14 @@ label {
 
 }
 
-/*************登录界面样式区*********************/
+/*************登录界面样式区（卡片式，沿用项目 float/块级/固定px 语法，兼容老 Kindle WebKit）*********************/
 .c_login {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(255, 255, 255, 0.9);
+    background-color: rgba(255, 255, 255, 0.9); /* 半透明白蒙层：透出下方水墨画背景 */
     z-index: 1000;
     width: 100%;
     height: 100%;
@@ -112,7 +98,7 @@ label {
     display: block;
 }
 
-/* 底部背景图样式 */
+/* 背景水墨画：沿用项目原有 fixed + z-index:-1 铺法（老 Kindle WebKit 兼容） */
 .login-bg-bottom {
     position: fixed;
     left: 0;
@@ -129,41 +115,166 @@ label {
     object-fit: cover;
 }
 
-/* 登录框内层容器 */
+/* 登录卡片：块级 + margin auto 水平居中（不用 flex/grid/transform，老 WebKit 最稳） */
 .login-content {
-    padding: 30px;
-    background-color: rgba(255, 255, 255, 0.70);
-    border: 4px solid #000;
-    border-radius: 8px;
+    /* 外观不变（白色圆角卡片 / logo / 标题 / 蓝色按钮），只收紧内边距与间距，
+       让整页在 480x640~758x1024 都能一屏放下。原因：.c_login 是 fixed+overflow:auto，
+       内容一超高，老 Kindle WebKit 聚焦输入框时会触发内部滚动，表现为「点输入框后页面变大」。 */
+    padding: 20px 22px 16px;
+    background-color: #FFFFFF;
+    border: 3px solid #B9C2D2;
+    border-radius: 26px;
+    -webkit-border-radius: 26px;
     box-sizing: border-box;
     position: relative;
-    width: 100%;
+    width: 90%;
     max-width: 520px;
-    margin: 30% auto 0; /* 输入框位置 */
+    margin: 15% auto 16px;
     z-index: 1;
 }
 
-.login-content .form-label {
-    width: 15%; /* 设置登录框标签宽度 */
+/* 顶部 logo */
+.login-logo-wrap {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 8px;
 }
 
-.login-content .input-wrapper {
-    width: 85%; /* 输入框占据剩余宽度 */
+.login-logo {
+    width: 64px;
+    height: 64px;
+    border: none;
+}
+
+/* 标题与副标题 */
+.login-content .login-title {
+    font-size: 34px;
+    font-weight: bold;
+    color: #1B1F26;
+    text-align: center;
+    margin: 0 0 2px 0;
+    padding: 0;
+    border: none;
+}
+
+.login-content .login-subtitle {
+    font-size: 20px;
+    color: #5B6472;
+    text-align: center;
+    line-height: 1.4;
+    margin: 0 0 12px 0;
+}
+
+/* 字段行：标签独占一行在上、输入框在下。
+   不复用全局 .form-label / .input-wrapper 的 float 左右布局，改用块级堆叠。
+   全部用 display:block + float:none + width:100% 显式覆盖，避免老 WebKit 继承浮动。 */
+.login-content .form-row {
+    width: 100%;
+    margin-bottom: 10px;
+    overflow: hidden;
+    clear: both;
+}
+
+.login-content .login-field-label {
+    display: block;
+    float: none;
+    width: 100%;
+    text-align: left;
+    font-size: 24px;
+    font-weight: bold;
+    color: #333A45;
+    line-height: 1.3;
+    margin: 0 0 4px 0;
+    padding: 0;
+    white-space: normal;
+}
+
+.login-content .login-field-input {
+    display: block;
+    float: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.login-content .form-control {
+    width: 100%;
+    height: 50px;
+    /* 输入框字号与字段标签(24px)、登录按钮(28px)取同一梯度，避免过大显得突兀；
+       不再沿用旧版强行放大的 36px，聚焦放大改由 viewport 侧统一规避。 */
+    font-size: 26px;
+    color: #1B1F26;
+    background-color: #FFFFFF;
+    /* 去掉原生控件外观：老 Kindle 对带原生外观的 input 会在聚焦时按「小控件」放大整页 */
+    -webkit-appearance: none;
+    border: 2px solid #D8DEE8;
+    border-radius: 12px;
+    -webkit-border-radius: 12px;
+    box-sizing: border-box;
+    padding: 0 12px;
+    margin: 0;
+}
+
+/* 占位文字为渐进增强；老浏览器不显示时，上方「用户名/密码」标签仍可辨认输入框 */
+.login-content .form-control::-webkit-input-placeholder {
+    color: #6B7280;
 }
 
 /* 登录按钮区域 */
 .login-content .button-group {
-    margin-top: 15px;
+    margin-top: 14px;
     text-align: center;
     position: relative;
-    clear: both; /* 清除浮动 */
+    clear: both;
+}
+
+.login-content .btn-primary {
+    width: 100%;
+    height: 54px;
+    font-size: 28px;
+    font-weight: bold;
+    color: #FFFFFF;
+    background-color: #3B7CF6;
+    border: 2px solid #2B62D0; /* 灰度屏下也能勾出按钮轮廓 */
+    border-radius: 12px;
+    -webkit-border-radius: 12px;
+    cursor: pointer;
+}
+
+.login-content .btn-primary:hover {
+    background-color: #3B7CF6;
+}
+
+.login-content .btn-primary:active {
+    background-color: #2B62D0;
+}
+
+/* 底部「没有账号？ 注册」 */
+.login-content .login-footer {
+    width: 100%;
+    text-align: center;
+    margin-top: 12px;
+    font-size: 22px;
+    color: #8A919D;
+    clear: both;
+}
+
+.login-content .login-footer-text {
+    color: #5B6472;
+}
+
+.login-content .login-footer-link {
+    color: #3B7CF6;
+    font-weight: bold;
+    cursor: pointer;
+    margin-left: 6px;
 }
 
 .login-loading {
-    display: none; 
+    display: none;
     position: absolute;
     margin: 10px;
 }
+
 /*************书架内容样式区*********************/
 #bookshelf {
     margin-top: 0px;
@@ -303,7 +414,7 @@ label {
     top: 0;
     left: 0;
     right: 0;
-    height: 120px;
+    height: 136px;
     background: #FFF;
     display: none;
     border-bottom: 8px solid #000;
@@ -312,6 +423,7 @@ label {
 
 .top-menu-left {
     float: left;
+    padding-top: 10px;
     padding-bottom: 10px;
     margin-left: 15px;
 }
@@ -325,7 +437,9 @@ label {
 
 .top-menu-right {
     float: right;
+    padding-top: 10px;
     padding-bottom: 10px;
+    margin-right: 15px;
 }
 
 /* 底部菜单样式 - 独立结构 */
@@ -334,7 +448,7 @@ label {
     bottom: 0;
     left: 0;
     right: 0;
-    height: 120px;
+    height: 136px;
     background: #FFF;
     display: none;
     border-top: 8px solid #000;
@@ -344,6 +458,7 @@ label {
 .bottom-menu-left {
     float: left;
     padding-top: 10px;
+    padding-bottom: 10px;
     margin-left: 15px;
 }
 
@@ -357,6 +472,8 @@ label {
 .bottom-menu-right {
     float: right;
     padding-top: 10px;
+    padding-bottom: 10px;
+    margin-right: 15px;
 }
 
 /* 图标按钮样式 */
@@ -451,50 +568,63 @@ label {
     right: 15px;
 }
 
-/* 设置模态框的表单行样式 */
+/* 设置模态框的表单行样式：统一 8px 间距节奏 */
 .config-content .form-row {
     width: 100%;
-    margin-bottom: 15px;
+    margin-bottom: 8px;
     overflow: hidden; /* 清除浮动 */
 }
 
+/* 标签列对齐：固定像素宽 + 左对齐，四行标签起点一致 */
 .config-content .form-label {
-    width: 10%; /* 设置模态框标签宽度稍大一些 */
+    width: 88px; /* 固定标签列宽，保证 字体/字号/字距/行距/翻页 左边缘对齐 */
+    text-align: left;
 }
 
 .config-content .input-wrapper {
-    width: 90%; /* 输入框占据剩余宽度 */
+    width: calc(100% - 88px); /* 与标签列宽配套，输入框占剩余宽度 */
 }
 
-/* 字体选择器容器 */
+/* 字体选择器容器：下拉与「加粗」同一行 */
 .font-selector {
     display: block;
     width: 100%;
+    white-space: nowrap;
+    line-height: 45px; /* 与控件统一高度对齐 */
 }
 
-/* 字体下拉框样式 */
+/* 字体下拉框样式：与数字框统一高度 45px */
 #fontFamily {
     width: 100%;
     max-width: 170px;
+    height: 45px;
+    line-height: 45px;
     border: 2px solid #000;
+    vertical-align: middle;
 }
 
 .number-input {
     width: 100%; /* 改为100%宽度，适应容器 */
     max-width: 170px; /* 但限制最大宽度 */
+    height: 45px;
+    line-height: 45px;
 }
 
-/* 加粗控制区域 */
+/* 加粗控制区域：与下拉同一行，垂直居中 */
 .bold-control {
     display: inline-block;
-    margin-left: 25px;
+    margin-left: 16px;
+    vertical-align: middle;
+    height: 45px;
+    line-height: 45px;
 }
 
 /* 复选框样式 */
 .checkbox-control {
     vertical-align: middle;
-    padding: 20px;
-    width: 20px;
+    width: 24px;
+    height: 24px;
+    margin: 0;
 }
 
 /* 加粗标签样式 */
@@ -514,7 +644,7 @@ label {
 .page-turning-content-cell {
     width: 100%;
     overflow: hidden;
-    margin-top: 10px;
+    margin-top: 4px;
 }
 
 .page-turning-options {
@@ -524,24 +654,92 @@ label {
     width: 100%;
 }
 
-/* 单个翻页选项样式 */
+/* 单个翻页选项：卡片式，缩小下边距 */
 .page-option {
     display: inline-block;
     width: 23%; /* 4个选项各占23%宽度 */
     text-align: center;
-    margin: 5px 5px;
+    margin: 4px 5px 2px;
 }
 
-/* 翻页方式图片样式 */
+/* 翻页卡片：白底细框 + 图文竖向排列；选中由 .page-option.active 覆盖为加粗黑框 */
+.page-card {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    border: 2px solid #DFE3E8;
+    border-radius: 8px;
+    -webkit-border-radius: 8px;
+    padding: 8px 4px 6px;
+    text-align: center;
+    cursor: pointer;
+}
+
+/* 翻页方式图片样式：缩小高度，卡片更紧凑 */
 .page-image {
-    height: 120px;
+    height: 96px;
     max-width: 100%;
+    display: block;
+    margin: 0 auto 4px;
 }
 
 /* 翻页方式单选按钮样式 */
 .page-radio {
-    margin-top: 5px;
+    margin-top: 0;
+    vertical-align: middle;
 }
+
+/* 翻页文字标签：仿真/平移/上下/无动画 */
+.page-label {
+    display: block;
+    font-size: 18px;
+    color: #333;
+    line-height: 22px;
+    margin-top: 2px;
+}
+
+/* 选中项：加粗黑框 + 文字加粗 */
+.page-option.active .page-card {
+    border: 3px solid #000;
+    background: #F5F6F8;
+    padding: 7px 3px 5px; /* 抵消加粗边框的 1px，避免卡片跳动 */
+}
+.page-option.active .page-label {
+    font-weight: bold;
+    color: #000;
+}
+
+/* 焦点圈：键盘/触控聚焦时给出清晰可见的轮廓（老 WebKit 用 outline 兼容最好） */
+.config-content input:focus,
+.config-content select:focus,
+.config-content button:focus,
+.bm-card-btn:focus,
+.bm-card-select:focus,
+.about-entry:focus,
+.page-card:focus {
+    outline: 3px solid #165DFF;
+    outline-offset: 1px;
+}
+
+/* 错峰入场动效：仅作用于设置弹窗的三个区块标题，轻量淡入上移；
+   使用 both 填充，动画不被支持或被打断时元素仍以最终态显示，绝不影响可读性。
+   Kindle WebKit 534 同时写 -webkit- 前缀与标准写法。 */
+@-webkit-keyframes xreadSecIn {
+    from { opacity: 0; -webkit-transform: translateY(6px); }
+    to   { opacity: 1; -webkit-transform: translateY(0); }
+}
+@keyframes xreadSecIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.config-content h2 {
+    -webkit-animation: xreadSecIn 0.32s ease both;
+    animation: xreadSecIn 0.32s ease both;
+}
+.config-content h2:nth-of-type(1) { -webkit-animation-delay: 0s;    animation-delay: 0s; }
+.config-content h2:nth-of-type(2) { -webkit-animation-delay: 0.08s; animation-delay: 0.08s; }
+.config-content h2:nth-of-type(3) { -webkit-animation-delay: 0.16s; animation-delay: 0.16s; }
 
 .font-config button {
     margin: 10px;
@@ -616,7 +814,9 @@ label {
     border-radius: 4px;
     z-index: 1101; /* 确保内容在模态框背景之上 */
     margin: 0 auto;
-    overflow: hidden; /* 隐藏溢出 */
+    overflow: hidden; /* 横向隐藏 */
+    overflow-y: auto; /* r51: 内容超高可上下滚动（设置页配置书籍卡片较多，真Kindle之前被裁切无法滑动） */
+    -webkit-overflow-scrolling: touch;
     position: relative; /* 为关闭按钮提供定位上下文 */
 }
 
@@ -790,6 +990,7 @@ label {
     color: #000;
     padding: 0px; /* 左右内边距 */
     line-height: 70px;
+    white-space: nowrap;
 }
 
 .modal-menu .page-info span {
@@ -797,8 +998,8 @@ label {
 }
 
 .modal-menu .page-separator {
-    margin: 0px; /* 分隔符的左右外边距 */
     color: #000;
+    margin: 0 -3px; /* r41) 仅斜杠用负边距抵消两侧 HTML 空白间隙(约7px->1px)，不影响数字 span 布局 */
 }
 /*************模态框关闭按钮样式区*********************/
 .close {
@@ -906,3 +1107,734 @@ input {
     font-size: 28px;
 }
 
+/* 设置页分区标题：黑色细分割线（用户要求保留的美化，r21基底回退后重新叠加） */
+h2 {
+    color: #000;
+    border-bottom: 2px solid #000;
+}
+/* 设置页三个区块标题：统一 8px 间距节奏 + 区块序号 01/02/03（小号灰字，位于标题左侧） */
+.config-content h2 {
+    margin: 16px 0 10px;
+    padding-bottom: 6px;
+    font-size: 30px;
+}
+.config-content h2 .sec-no {
+    display: inline-block;
+    font-size: 18px;
+    font-weight: normal;
+    color: #999;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+/* 设置弹窗底部：版本号 + 真机视口（小号灰字，便于确认是否加载了新包） */
+.build-tag {
+    clear: both;
+    margin: 10px 0 4px 0;
+    font-size: 18px;
+    line-height: 26px;
+    color: #8A919D;
+    text-align: left;
+}
+
+/*************设置页底部：关于本机入口（低调文字链接）*********************/
+.about-entry {
+    display: table-cell;
+    width: 22%;
+    text-align: right;
+    vertical-align: middle;
+    font-size: 21px;
+    color: #999;
+    cursor: pointer;
+}
+
+/*************关于本机弹窗：圆角卡片 + 左对齐信息行*********************/
+.about-modal {
+    z-index: 1200; /* 盖在设置弹窗（1100）之上 */
+}
+.about-modal .about-content {
+    width: 82%;
+    max-width: 560px;
+    margin: 56px auto 0; /* 固定像素，避免小屏按百分比下移导致底部超出 */
+    padding: 24px 30px 20px;
+    background: #FFF;
+    border: 2px solid #000;
+    border-radius: 16px;
+    -webkit-border-radius: 16px;
+    position: relative;
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+}
+.about-modal .about-close {
+    position: absolute;
+    top: 8px;
+    right: 18px;
+    font-size: 42px;
+    line-height: 38px;
+    color: #333;
+    cursor: pointer;
+    width: 40px;
+    height: 40px;
+    text-align: center;
+}
+.about-modal .about-heading {
+    font-size: 32px;
+    color: #1B1F26;
+    margin: 0 0 10px 0;
+    padding: 0 0 8px 0;
+    border-bottom: 2px solid #333;
+    text-align: left;
+}
+.about-modal .about-row {
+    width: 100%;
+    overflow: hidden;
+    font-size: 23px;
+    line-height: 46px;
+}
+.about-modal .about-label {
+    float: left;
+    width: 27%;
+    color: #5B6472;
+}
+.about-modal .about-value {
+    float: left;
+    width: 73%;
+    color: #1B1F26;
+    word-break: break-all;
+}
+.about-modal .about-footnote {
+    margin-top: 14px;
+    padding-top: 0;
+    font-size: 19px;
+    color: #808895;
+    text-align: center;
+}
+
+/*************设置页：书籍管理功能区*********************/
+.book-mgmt-section {
+    width: 100%;
+    margin: 10px 0 16px 0;
+    clear: both;
+}
+/* r23：按钮容器改用与「配置翻页」四图完全相同的 flex 四列，保证逐列对齐 */
+.book-mgmt-buttons {
+    display: flex;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    width: 100%;
+    clear: both;
+}
+/* 每格 23% + 左右各 5px，与 .page-option 完全同参。
+   旧 Kindle WebKit 不认父级 display:flex（退化为 block），故 cell 必须 inline-block 才能一行排列；
+   r23 漏写此声明导致四按钮真机竖排，r24 补回。 */
+.book-mgmt-cell {
+    display: inline-block;
+    vertical-align: top;
+    width: 23%;
+    margin: 5px 5px;
+    text-align: center;
+}
+/* 四个按钮一行，与目录弹层最下面那行（刷新 / 上一页 / 下一页）同款：
+   白底、无边框、黑色文字、直角，只用文字区分，不做灰色块。
+   宽度 22% + 左右各 1.5% 间距 = 100%；
+   选择器带上父级：.modal-content button 也设了 margin:2px，同权重会被它覆盖 */
+/* r23：按钮只包住文字（左右 8px），选中黑块不再过宽；
+   字体显式继承并统一为 28px/#000/加粗，与「翻页：」标签(.form-label)完全一致 */
+.book-mgmt-buttons .book-mgmt-btn {
+    display: inline-block;
+    width: auto;
+    margin: 0;
+    height: 46px;
+    line-height: 46px;
+    padding: 0 8px;
+    font-family: inherit;
+    font-size: 28px;
+    font-weight: bold;
+    white-space: nowrap;
+    text-align: center;
+    vertical-align: middle;
+    border: none;
+    background: #FFF;
+    color: #000;
+    -webkit-border-radius: 0;
+    border-radius: 0;
+}
+/* 窄视口（<560px，仅桌面模拟会遇到）字号回落，避免「缓存书籍」四个字超出 23% 的按钮宽度。
+   Kindle PW7 实测视口在 1000px 以上，走上面的 29px。 */
+/* 选中：与目录弹层按钮的下压态一致，反白显示 */
+.book-mgmt-buttons .book-mgmt-btn.active {
+    background: #000;
+    color: #FFF;
+    font-weight: bold;
+}
+/* 展开时才出现：按钮下方一道下划线，线下就是一行处理详情 */
+.book-mgmt-detail {
+    display: none;
+    clear: both;
+    margin-top: 10px;
+    padding-top: 12px;
+    border-top: 1px solid #E5E8ED;
+}
+.book-mgmt-panel {
+    display: none;
+    width: 100%;
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    /* 移动书籍面板里 select 用 float 占位，父级清浮动 */
+    overflow: hidden;
+}
+/* 处理详情：统一一行展示 */
+.book-mgmt-line {
+    width: 100%;
+    font-size: 24px;
+    line-height: 38px;
+    /* 处理详情统一黑色，不做红绿区分 */
+    color: #000;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* 移动书籍：选择框与移动结果在同一行 */
+/* r23：细节行整体右移，与上方按钮文字第一列起点对齐，不再贴弹窗最左 */
+.book-mgmt-panel {
+    padding-left: 5%;
+}
+.book-mgmt-select {
+    /* 分组名按「最长五个汉字」定宽：24px×5=120 + 左右内边距 16 + 下拉箭头 20 ≈ 156，
+       取 160px 固定值，不再按百分比随弹窗变宽——之前 54% 在 Kindle 上宽达半个屏。 */
+    display: inline-block;
+    vertical-align: middle;
+    width: 160px;
+    max-width: 160px;
+    height: 46px;
+    font-size: 24px;
+    margin: 0;
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+}
+.book-mgmt-inline {
+    /* 结果文字紧跟选择框(留 10px)，不再撑到弹窗右侧；过长自动省略 */
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 10px;
+    width: auto;
+    max-width: 50%;
+    font-size: 22px;
+    line-height: 46px;
+    height: 46px;
+    color: #000;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/*************书籍管理：移动书籍面板*********************/
+.book-group-panel {
+    display: none;
+    width: 100%;
+    margin-top: 18px;
+    padding: 16px 20px;
+    border-top: 2px solid #000;
+    box-sizing: border-box;
+    clear: both;
+    text-align: left;
+}
+
+.book-group-title {
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 12px;
+}
+
+.book-group-row {
+    width: 100%;
+    overflow: hidden;
+    clear: both;
+}
+
+.book-group-row select {
+    width: 100%;
+    height: 45px;
+    font-size: 28px;
+}
+
+.book-group-hint {
+    width: 100%;
+    clear: both;
+    margin-top: 10px;
+    font-size: 24px;
+    color: #555555;
+    min-height: 30px;
+}
+
+/* 处理结果：成功绿色、失败红色 */
+/* 处理结果：正常/异常都用黑色文字（类名保留，便于后续需要时再区分） */
+.book-mgmt-ok {
+    color: #000;
+}
+
+.book-mgmt-err {
+    color: #000;
+}
+
+/*************书籍管理：缓存提示 + 删除确认面板*********************/
+.book-manage-hint {
+    width: 100%;
+    clear: both;
+    text-align: center;
+    font-size: 24px;
+    color: #B00020;
+    min-height: 32px;
+    margin-top: 6px;
+}
+
+.book-delete-panel {
+    display: none;
+    width: 100%;
+    margin-top: 18px;
+    padding: 16px 20px;
+    border-top: 2px solid #000;
+    box-sizing: border-box;
+    clear: both;
+    text-align: left;
+}
+
+.book-delete-title {
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 12px;
+}
+
+.book-delete-info {
+    font-size: 26px;
+    line-height: 1.6;
+    word-break: break-all;
+}
+
+.book-delete-check {
+    display: block;
+    width: 100%;
+    margin-top: 14px;
+    font-size: 26px;
+    clear: both;
+}
+
+.book-delete-check input {
+    width: 28px;
+    height: 28px;
+    vertical-align: middle;
+    margin-right: 8px;
+}
+
+/*************漫画：一张图一页*********************/
+.comic-page {
+    width: 100%;
+    text-align: center;
+}
+
+.comic-page img {
+    display: block;
+    margin: 0 auto;
+}
+
+/************* r47) 配置书籍：2×2 卡片布局（参考附件设计） *****************/
+.bm-cards {
+    width: 100%;
+    clear: both;
+}
+/* r49: 每一行用 table 布局 -> 同行卡片自动等高，高度由内容撑起 */
+.bm-card-row {
+    display: table;
+    width: 100%;
+    border-spacing: 12px 0;
+    margin: 0 -12px;
+    table-layout: fixed;
+}
+/* 每张卡 48% 宽，两张并排；inline-block + vertical-align 兼容老 WebKit */
+.bm-card {
+    display: table-cell;
+    vertical-align: top;
+    width: 50%;
+    padding: 16px 18px 18px 18px;
+    border: 2px solid #000;
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    text-align: left;
+}
+.bm-card-hd {
+    width: 100%;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+.bm-card-id {
+    display: inline-block;
+    font-size: 20px;
+    color: #888;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+.bm-card-title {
+    display: inline-block;
+    font-size: 26px;
+    font-weight: bold;
+    color: #000;
+    vertical-align: middle;
+}
+/* 大数字（章 / MB）：显著大于说明文字 */
+.bm-card-value {
+    width: 100%;
+    font-size: 40px;
+    font-weight: bold;
+    color: #000;
+    line-height: 1.1;
+    margin: 6px 0 4px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.bm-card-unit {
+    font-size: 20px;
+    font-weight: normal;
+    color: #444;
+    margin-left: 4px;
+}
+.bm-card-note {
+    width: 100%;
+    font-size: 18px;
+    color: #555;
+    line-height: 1.3;
+    margin-bottom: 12px;
+    min-height: 24px;
+}
+/* 卡片按钮：整行大按钮 */
+.bm-card-btn {
+    display: block;
+    width: 100%;
+    height: 52px;
+    line-height: 48px;
+    font-family: inherit;
+    font-size: 24px;
+    font-weight: bold;
+    text-align: center;
+    vertical-align: middle;
+    cursor: pointer;
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+}
+.bm-btn-dark {
+    background: #000;
+    color: #FFF;
+    border: 2px solid #000;
+}
+.bm-btn-light {
+    background: #FFF;
+    color: #000;
+    border: 2px solid #000;
+}
+/* 二次确认态：蓝底白字，对应附件「确认删除?」 */
+.bm-btn-confirm {
+    background: #165DFF;
+    color: #FFF;
+    border: 2px solid #165DFF;
+}
+.bm-card-select {
+    display: block;
+    width: 100%;
+    height: 48px;
+    font-family: inherit;
+    font-size: 22px;
+    margin: 6px 0 2px 0;
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+}
+.bm-book-title {
+    width: 100%;
+    font-size: 22px;
+    font-weight: bold;
+    color: #000;
+    line-height: 24px;
+    height: 48px; /* 与 C 卡下拉框(48px)等高，两卡内容区对齐 */
+    margin: 6px 0 2px 0;
+    overflow: hidden;
+    word-break: break-all;
+}
+.bm-book-author {
+    width: 100%;
+    font-size: 22px; /* 与书名同字号，字体保持一致 */
+    font-weight: normal;
+    color: #555;
+    line-height: 24px;
+    margin-bottom: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* 底部统一状态栏：✓ + 详细进度 */
+/* r49: 状态栏与关于本机同一行 */
+.bm-status-row {
+    width: 100%;
+    clear: both;
+    display: table;
+    table-layout: fixed;
+    width: 100%;
+    margin-top: 6px;
+    padding: 12px 0 2px 0;
+    border-top: 2px solid #333;
+}
+.bm-status-bar {
+    display: table-cell;
+    width: 78%;
+    vertical-align: middle;
+    font-size: 19px;
+    line-height: 1.4;
+    color: #000;
+    text-align: left;
+}
+.bm-status-check {
+    display: inline-block;
+    font-size: 22px;
+    color: #000;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+.bm-status-text {
+    display: inline-block;
+    vertical-align: middle;
+    color: #000;
+}
+
+
+
+/* =====================================================================
+   r57 / v1.0.48.57 设置页结构统一样式（全局唯一来源，不区分终端）
+   ---------------------------------------------------------------------
+   两个 CSS 都被所有端加载（kindle.css → other.css），差异仅在字号。
+   结构/对齐/颜色问题三端一致，统一在 kindle.css 写一份全局规则；
+   因 other.css 后加载且 .xread-browser 适配层特异性更高，结构属性用
+   !important 确保全局生效；字号按端适配（Kindle 标签 28px / 手机 18px）。
+   1) 字体配置：四框等高、数字垂直居中、标签贴近；字体框字号=该端标签字号
+   2) 配置翻页：恢复 1.0.48.52 朴素样式（img<br>radio，无卡片框/无文字标签）
+   3) 配置书籍：C卡选择框缩字、作者名样式对齐书名、灰色字加深、按钮同行
+   4) 关于本机入口：字体颜色加深
+   ===================================================================== */
+/* 1) 字体配置：四框等高、数字垂直居中、标签贴近输入框 */
+.config-content .form-label {
+    width: 76px !important;
+    line-height: 44px !important;
+    padding-right: 6px !important;
+    text-align: left !important;
+}
+.config-content .input-wrapper { width: calc(100% - 76px) !important; }
+#fontFamily, .number-input, .config-content input.form-control {
+    box-sizing: border-box !important;
+    -webkit-box-sizing: border-box !important;
+    height: 44px !important;
+    line-height: 24px !important;
+    padding: 8px 9px !important;
+    margin: 0 !important;
+    vertical-align: middle !important;
+}
+/* 字体选择框字形/字号与标签一致：Kindle 标签 28px；手机端在 other.css 覆盖为 18px */
+#fontFamily { font-family: inherit !important; font-size: 22px !important; }
+.font-selector { line-height: 44px !important; }
+.bold-control { height: 44px !important; line-height: 44px !important; margin-left: 12px !important; }
+/* 2) 配置翻页：恢复 .52 —— 朴素图文（无 page-card 边框/无 page-label 文字） */
+.page-option { margin: 5px 5px !important; }
+.page-image { display: inline !important; margin: 0 !important; }
+.page-radio { margin-top: 5px !important; vertical-align: middle !important; }
+/* 3) 配置书籍 */
+.bm-card-select { font-size: 17px !important; }               /* C 卡选择框缩字 */
+.bm-book-title, .bm-book-author {                              /* 作者名与书名样式一致 */
+    height: auto !important;
+    line-height: 1.3 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-weight: bold !important;
+    color: #000 !important;
+}
+.bm-card-note, .bm-card-unit { color: #333 !important; }       /* 灰色字体加深 */
+.bm-card { position: relative !important; padding-bottom: 62px !important; }
+.bm-card-btn {
+    position: absolute !important;
+    left: 18px !important;
+    right: 18px !important;
+    bottom: 18px !important;
+    width: auto !important;
+    height: 44px !important;
+    line-height: 40px !important;
+    margin: 0 !important;
+}
+/* 4) 关于本机入口：字体颜色加深 */
+.about-entry { color: #444 !important; }
+
+
+
+/* =====================================================================
+   r59 / v1.0.48.59 三端统一再精修（全局唯一来源，不区分终端）
+   ---------------------------------------------------------------------
+
+   2) 01/02/03 区块序号颜色加深（#999→#333）
+   3) 配置翻页图片放大（96→130px）、圆形 radio 区域高度收紧
+   4) 卡片 A/B/C/D 字母颜色加深（#888→#333）
+   5) 卡片 D 书名/作者字号再缩小一档（22→20px）
+   ===================================================================== */
+
+/* 2) 区块序号颜色加深 */
+.config-content h2 .sec-no { color: #333 !important; }
+/* 3) 翻页：图片放大 + radio 区高度收紧 */
+.page-image { height: 130px !important; }
+.page-radio { margin-top: 2px !important; }
+.page-turning-options { line-height: 1.1 !important; }
+/* 4) 卡片字母颜色加深 */
+.bm-card-id { color: #333 !important; }
+/* 5) 卡片 D 书名/作者再缩一档 */
+.bm-book-title, .bm-book-author { font-size: 20px; }
+
+/* =====================================================================
+   r60 / v1.0.48.60 三端差异修复（结构/颜色仍统一在 kindle.css 维护；字号按端适配）
+   ---------------------------------------------------------------------
+   1) Kindle 字体选择框文字偏大：#fontFamily 由 28px 调为 22px；
+      手机/PC 由 other.css 的 .xread-browser #fontFamily(18px !important) 覆盖，不受影响。
+   2) D 卡书名/作者：r59 的全局 20px !important 会压过 other.css 手机端 14px，
+      导致手机端被撑大。去掉 !important 后：Kindle 保留 20px，手机回落 14px。
+
+   ===================================================================== */
+
+
+/* =====================================================================
+   r61 / v1.0.48.61 交互反馈与字号精修
+   ---------------------------------------------------------------------
+   1) 配置书籍四按钮：按下(:active)时按钮内字体加粗反馈（三端统一）
+
+   3) 配置翻页 radio：选中/聚焦后的黑色方形轮廓改为与弹窗背景同色(#FFF)，三端统一
+   4) Kindle 字体选择框字号 22px -> 18px（与手机端一致）
+   ===================================================================== */
+/* 1) 按钮按下字体加粗：默认已 bold，按下时用 text-shadow 模拟进一步加粗的视觉反馈(Kindle 534 兼容) */
+.bm-card-btn:active {
+    font-weight: bold !important;
+    text-shadow: 0 0 1px currentColor, 0 0 1px currentColor !important;
+}
+/* 3) 翻页 radio 选中/聚焦后的黑色方形轮廓 -> 与弹窗背景同色(#FFF)，三端统一 */
+.page-radio:focus { outline: 3px solid #FFF !important; outline-color: #FFF !important; }
+/* 4) Kindle 字体选择框字号再调小：22px -> 18px */
+#fontFamily { font-size: 18px !important; }
+
+
+/* =====================================================================
+   r62 / v1.0.48.62 配置书籍按钮字重交互修正
+   ---------------------------------------------------------------------
+   r61 误将按钮默认设为 bold 并用 text-shadow 描边模拟"按下加粗"。
+   按用户澄清改为：默认正常(normal)，点击(:active / :focus)后加粗(bold)。
+   用 !important 全局覆盖，确保 kindle/手机/PC 三端一致；
+   :active/:focus 伪类特异性高于普通类，点击时 bold 会压过默认 normal。
+   ===================================================================== */
+.bm-card-btn { font-weight: normal !important; text-shadow: none !important; }
+.bm-card-btn:active,
+.bm-card-btn:focus { font-weight: bold !important; text-shadow: none !important; }
+
+/* =====================================================================
+   r63 / v1.0.48.63 按钮加粗持久化 + 关于本机再放大 + 字体框微调
+   ---------------------------------------------------------------------
+   1) 配置书籍四按钮：改用 JS 点击后加 .bm-btn-pressed 持久 class 控制加粗，
+      解决 Kindle WebKit 点击触发操作后 :active/:focus 立即丢失的问题
+
+   3) Kindle 字体选择框 18px -> 20px（大一点点）
+   ===================================================================== */
+/* 1) 按钮加粗：持久 class 伪类双保险，默认 normal，点击后 pressed 加粗 */
+.bm-card-btn { font-weight: normal !important; text-shadow: none !important; }
+.bm-card-btn.bm-btn-pressed,
+.bm-card-btn:active,
+.bm-card-btn:focus { font-weight: bold !important; text-shadow: none !important; }
+/* 3) Kindle 字体选择框字号再大一点点：18px -> 20px */
+#fontFamily { font-size: 20px !important; }
+
+
+/* =====================================================================
+   r64 / v1.0.48.64 按钮选中态强化 + 关于本机回退 + 字体框 22px
+   ---------------------------------------------------------------------
+   1) 按钮点击后变化不明显：在加粗基础上加 text-shadow 白色描边(字更粗亮)
+      + box-shadow inset 白色内边框(黑底按钮点击后明显变样)，Kindle 534 兼容
+
+   3) 字体选择框 20px -> 22px（手机端 other.css 高特异性保持 18px 不受影响）
+   ===================================================================== */
+/* 1) 按钮点击后强化反馈 */
+.bm-card-btn { font-weight: normal !important; text-shadow: none !important; box-shadow: none !important; }
+.bm-card-btn.bm-btn-pressed,
+.bm-card-btn:active,
+.bm-card-btn:focus {
+    font-weight: bold !important;
+    text-shadow: 0 0 2px #FFF, 0 0 2px #FFF, 0 0 2px #FFF !important;
+    box-shadow: inset 0 0 0 3px #FFF !important;
+}
+/* 3) 字体选择框 20px -> 22px */
+#fontFamily { font-size: 22px !important; }
+
+/* =====================================================================
+   r67 / v1.0.48.69 about 样式唯一来源 + Kindle 字体框宽度对齐（继承 r67，清理 r58-r66 历史补丁）
+   ---------------------------------------------------------------------
+   本块是 about 弹窗样式的唯一来源。kindle.css 上方 r58-r64 的历史 about
+   !important 补丁已全部删除；other.css 中的 about 规则是手机端黑框/滚动/
+   居中的框架适配，被本块高特异性规则覆盖，不构成第二套字号/宽度定义。
+   1) 手机/PC：弹窗收窄至 84%（不再与设置页黑框边线重合），label 100px 不重叠
+   2) Kindle：弹窗 78%(max 640)，label 148px，行高紧凑不细长
+   3) 字体框 21px；Kindle 端去原生外观 + 自定义下拉箭头 + 文字垂直居中
+   4) 配置书籍按钮：回退 .60（默认粗体、无点击特效）
+   ===================================================================== */
+/* --- 字体框 21px --- */
+#fontFamily { font-size: 21px !important; }
+/* --- Kindle 字体框：去原生外观 + 自定义下拉箭头 + 垂直居中 --- */
+html:not(.xread-browser) #fontFamily {
+    width: calc(100% - 76px) !important;
+    max-width: 170px !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    background-color: #FFF !important;
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAMCAYAAABiDJ37AAAAU0lEQVR4nGP8//8/AzUBE1VNGxIGsiBzTExMiA7QM2fOMGITZyJGEbGGYRhIjKGE5LGGIS5NxPgAZ6SgayY2OBj+//+PFxsbG/8npAYZMw76nAIA8MxXmA/ERlMAAAAASUVORK5CYII=') !important;
+    background-repeat: no-repeat !important;
+    background-position: 95% 50% !important;
+    height: 44px !important;
+    line-height: 40px !important;
+    padding: 0 9px !important;
+    text-indent: 0 !important;
+}
+/* --- 配置书籍按钮回退 .60 --- */
+.bm-card-btn { font-weight: bold !important; text-shadow: none !important; box-shadow: none !important; }
+.bm-card-btn.bm-btn-pressed,
+.bm-card-btn:active,
+.bm-card-btn:focus { font-weight: bold !important; text-shadow: none !important; box-shadow: none !important; }
+
+/* --- 关于本机 · 手机/PC（宽 84%, label 100px） --- */
+html.xread-browser .about-modal .about-content {
+    width: 84% !important; max-width: 480px !important;
+    margin: 0 !important; position: absolute !important;
+    top: 50% !important; left: 50% !important;
+    -webkit-transform: translate(-50%, -50%) !important; transform: translate(-50%, -50%) !important;
+    padding: 16px 14px 12px !important; box-sizing: border-box !important; -webkit-box-sizing: border-box !important;
+}
+html.xread-browser .about-modal .about-heading { font-size: 20px !important; padding-bottom: 6px !important; margin-bottom: 8px !important; }
+html.xread-browser .about-modal .about-close { font-size: 44px !important; line-height: 40px !important; width: 40px !important; height: 40px !important; }
+html.xread-browser .about-modal .about-row { font-size: 14px !important; line-height: 28px !important; width: 100% !important; overflow: hidden !important; }
+html.xread-browser .about-modal .about-label { float: left !important; width: 100px !important; font-size: 14px !important; white-space: nowrap !important; }
+html.xread-browser .about-modal .about-value {
+    float: left !important; width: calc(100% - 100px) !important; font-size: 14px !important;
+    white-space: nowrap !important; word-break: normal !important; overflow: hidden !important; text-overflow: ellipsis !important;
+}
+html.xread-browser .about-modal .about-footnote { font-size: 14px !important; margin-top: 8px !important; }
+
+/* --- 关于本机 · Kindle（宽 78% max640, label 148px） --- */
+html:not(.xread-browser) .about-modal .about-content {
+    width: 78% !important; max-width: 640px !important;
+    margin: 0 !important; position: absolute !important;
+    top: 50% !important; left: 50% !important;
+    -webkit-transform: translate(-50%, -50%) !important; transform: translate(-50%, -50%) !important;
+    padding: 22px 20px 18px !important; box-sizing: border-box !important; -webkit-box-sizing: border-box !important;
+}
+html:not(.xread-browser) .about-modal .about-heading { font-size: 30px !important; padding-bottom: 8px !important; margin-bottom: 10px !important; }
+html:not(.xread-browser) .about-modal .about-close { font-size: 64px !important; line-height: 50px !important; width: 50px !important; height: 50px !important; }
+html:not(.xread-browser) .about-modal .about-row { font-size: 22px !important; line-height: 42px !important; width: 100% !important; overflow: hidden !important; }
+html:not(.xread-browser) .about-modal .about-label { float: left !important; width: 148px !important; font-size: 22px !important; white-space: nowrap !important; }
+html:not(.xread-browser) .about-modal .about-value {
+    float: left !important; width: calc(100% - 148px) !important; font-size: 22px !important;
+    white-space: nowrap !important; word-break: normal !important; overflow: hidden !important; text-overflow: ellipsis !important;
+}
+html:not(.xread-browser) .about-modal .about-footnote { font-size: 22px !important; margin-top: 12px !important; }

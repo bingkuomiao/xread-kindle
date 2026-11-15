@@ -1,0 +1,1417 @@
+/* =====================================================================
+   other.css —— 其他浏览器（手机 / Windows 浏览器）专用样式
+   ---------------------------------------------------------------------
+   定位：本项目主目标是 Kindle，css/kindle.css 为 Kindle 原生样式（视口 1000+）。
+        本文件只承载「非 Kindle」浏览器的适配规则，与 kindle.css 互不影响：
+        所有规则都包在 max-width / max-height 媒体查询内，Kindle PW7 永远不会触发。
+   统一字号：设置页标签/字号·字距·行距数字框/加粗、书籍管理按钮、关于页内容、
+        目录条目，统一在文件末尾【统一字号入口】一处调整，改一处即整组生效。
+   ===================================================================== */
+
+@media (max-width: 560px) {
+    .book-mgmt-cell {
+        width: 22%;
+        margin: 5px 1%;
+    }
+    .book-mgmt-buttons .book-mgmt-btn {
+        font-size: 24px;
+        height: 44px;
+        line-height: 44px;
+        padding: 0 4px;
+    }
+}
+
+@media (max-height: 700px) {
+    /* 矮屏（如 480x640）：压缩关于本机弹窗，保证 8 项信息 + 脚注完整在屏内 */
+    .about-modal .about-content {
+        margin-top: 8px;
+        padding: 16px 24px 12px;
+    }
+    .about-modal .about-heading {
+        font-size: 28px;
+        margin: 0 0 8px 0;
+        padding: 0 0 8px 0;
+    }
+    .about-modal .about-row {
+        font-size: 21px;
+        line-height: 36px;
+    }
+    .about-modal .about-label {
+        width: 38%;
+    }
+    .about-modal .about-value {
+        width: 62%;
+    }
+    .about-modal .about-footnote {
+        margin-top: 10px;
+        padding-top: 8px;
+    }
+}
+
+/* ================= 手机等窄屏兼容（视口 <= 700px；Kindle PW7 视口 1000+ 不受影响） ================= */
+@media (max-width: 700px) {
+    /* 1) 设置页标签:固定像素给足宽度,避免"字体/字号/字距/行距"被输入框遮挡 */
+    .config-content .form-label {
+        width: 76px;
+        font-size: 22px;
+        padding-right: 6px;
+    }
+    .config-content .input-wrapper {
+        width: calc(100% - 76px);
+    }
+    /* 数字框宽度沿用原始写法（已回退三问题hack） */
+    /* 加粗选项缩进收敛,避免窄屏被挤到下一行 */
+    .bold-control {
+        margin-left: 12px;
+    }
+    /* 2) 翻页四图一行:每选项 22% + 左右 1% 边距 */
+    .page-option {
+        width: 22%;
+        margin: 5px 1%;
+    }
+    .page-image {
+        height: 96px;
+    }
+    /* 3) 关于本机:加宽卡片 + 值列不换行,设备名称/服务端版本单行显示 */
+    .about-modal .about-content {
+        width: 96%;
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+    .about-modal .about-row {
+        font-size: 17px;
+    }
+    .about-modal .about-label {
+        width: 92px;
+    }
+    .about-modal .about-value {
+        width: calc(100% - 92px);
+        white-space: nowrap;
+    }
+    /* 4) 弹窗：手机上内容超高时允许内部滚动到底（书籍管理/关于本机）；
+          遮罩贴合视口、卡片左右留白，避免关闭按钮和「加粗」被裁出屏幕。
+          仅在 max-width:700 媒体查询内生效，Kindle PW7 视口 1000+ 不受影响。 */
+    .modal {
+        margin-left: 0;
+        padding-top: 10px;
+        width: 100%;
+    }
+    .modal-content {
+        width: 92%;
+        max-height: 94%;
+        overflow-x: hidden;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        box-sizing: border-box;
+        -webkit-box-sizing: border-box;
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+    /* 5) 手机端整体字号收敛：目录/设置弹窗内容在 iPhone 上偏大，统一缩小一档。
+         均在 max-width:700 媒体查询内，Kindle PW7 视口 1000+ 不受影响。 */
+    .modal-title, #chapterTitle {
+        font-size: 32px;
+        margin: 10px 0 8px 40px;
+    }
+    .modal-column button {
+        font-size: 28px;
+        line-height: 1.2;
+        padding: 2px 4px;
+        margin: 4px 0;
+    }
+    .config-content h2 {
+        font-size: 28px;
+        padding: 8px 0;
+        margin: 8px 0;
+    }
+    .config-content .form-label, .bold-label {
+        font-size: 22px;
+    }
+    .number-input, .form-control, select, input {
+        font-size: 24px;
+        height: 42px;
+    }
+    .page-image {
+        height: 80px;
+    }
+    .menu-icon {
+        width: 52px;
+        height: 52px;
+    }
+    .menu-text {
+        font-size: 20px;
+    }
+    .top-menu button, .bottom-menu button {
+        font-size: 40px;
+        height: 100px;
+    }
+    .top-menu, .bottom-menu {
+        height: 100px;
+    }
+    .modal-menu button, .modal-menu input, .modal-menu .page-info {
+        font-size: 28px;
+        height: 50px;
+        line-height: 1.2;
+        min-width: 80px;
+        padding: 8px 10px;
+        margin-right: 20px;
+    }
+    /* 6) 三弹窗样式统一（仅手机端）：目录页去掉额外 padding，左右边框与设置页对齐；
+          关于本机复用设置页的黑框 + 内部滚动方案，三者左右留白一致、都能滚动看全。
+          Kindle PW7 视口 1000+ 不触发本媒体查询，保持原样。 */
+    .bookChapterList {
+        padding: 0;
+    }
+    .about-modal .about-content {
+        width: 92%;
+        max-width: none;
+        max-height: 94%;
+        margin: 0 auto;
+        padding: 20px 16px 15px;
+        background: #FFF;
+        border: 4px solid #000;
+        border-radius: 4px;
+        -webkit-border-radius: 4px;
+        overflow-x: hidden;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        box-sizing: border-box;
+        -webkit-box-sizing: border-box;
+    }
+    /* 7) 内容字号再缩一档：设置页/目录页文字在 iPhone 上仍偏大 */
+    .modal-title, #chapterTitle {
+        font-size: 26px;
+    }
+    .modal-column button {
+        font-size: 22px;
+    }
+    .modal-menu button, .modal-menu input, .modal-menu .page-info {
+        font-size: 22px;
+        height: 44px;
+    }
+    .config-content h2 {
+        font-size: 24px;
+    }
+    .config-content .form-label, .bold-label {
+        font-size: 18px;
+    }
+    .number-input, .form-control, select, input {
+        font-size: 20px;
+        height: 38px;
+    }
+    .menu-text {
+        font-size: 18px;
+    }
+    .about-modal .about-heading {
+        font-size: 26px;
+    }
+    .about-modal .about-row {
+        font-size: 16px;
+        line-height: 34px;
+    }
+    /* 8) 登录页字号放大，对齐 XRead 参考（同条件截图）；仅手机端，Kindle 基线不动。
+         输入框 34px 远大于 iOS Safari 的 16px 聚焦缩放阈值，不会触发自动放大。 */
+    .login-content {
+        width: 94%;
+    }
+    .login-logo {
+        width: 80px;
+        height: 80px;
+    }
+    .login-content .login-title {
+        font-size: 46px;
+    }
+    .login-content .login-subtitle {
+        font-size: 26px;
+    }
+    .login-content .login-field-label {
+        font-size: 32px;
+    }
+    .login-content .form-control {
+        font-size: 34px;
+        height: 64px;
+    }
+    .login-content .btn-primary {
+        font-size: 36px;
+        height: 66px;
+    }
+    .login-content .login-footer {
+        font-size: 30px;
+    }
+    /* 9) 目录翻页控件一行：左右两组改 inline-block + nowrap，缩小按钮 */
+    .modal-menu { white-space: nowrap; text-align: center; }
+    .modal-menu-left, .modal-menu-right { float: none; display: inline-block; vertical-align: middle; }
+    .modal-menu button { min-width: 56px; margin-right: 10px; padding: 6px 8px; font-size: 18px; height: 40px; }
+    .modal-menu .page-info { font-size: 18px; line-height: 1.2; }
+    /* 10) 字体下拉框与「加粗」同行 */
+    .font-selector { white-space: nowrap; }
+    .bold-control { margin-left: 8px; }
+    /* 11) 三弹窗垂直居中：JS 用 inline display:block，此处用属性选择器 + !important 覆盖为 flex；
+         内容超高时子项 margin:auto 归零，仍可滚动看全、不裁切顶部 */
+    .modal[style*="block"] {
+        display: -webkit-flex !important;
+        display: flex !important;
+        -webkit-align-items: flex-start;
+        align-items: flex-start;
+        -webkit-justify-content: center;
+        justify-content: center;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+    .modal > .modal-content, .about-modal .about-content {
+        margin-top: auto !important;
+        margin-bottom: auto !important;
+    }
+    /* 12) 标题类字号（正文类统一见下方【统一字号入口】） */
+    .modal-title, #chapterTitle { font-size: 24px; }
+    .config-content h2 { font-size: 22px; }
+    .menu-text { font-size: 17px; }
+    .about-modal .about-heading { font-size: 24px; }
+
+    /* ===== 【统一字号入口】设置页标签 / 字号·字距·行距数字框 / 加粗、
+       书籍管理按钮、关于页内容、目录条目，统一在这里调整：
+       只改下面 font-size 的值，以上元素一起变，无需再逐条找。
+       登录页输入框为规避 iOS 聚焦缩放采用独立大字号，不在本组。
+       仅手机/其他浏览器（max-width:700）生效，Kindle PW7 视口 1000+ 不受影响。 ===== */
+    .config-content .form-label,
+    .bold-label,
+    .config-content .number-input,
+    .book-mgmt-buttons .book-mgmt-btn,
+    .book-mgmt-line,
+    .book-mgmt-inline,
+    .book-mgmt-select,
+    .about-modal .about-row,
+    .modal-column button {
+        font-size: 18px;
+    }
+
+    /* ===== 书架保持原尺寸（手机端 @media max-width:700）=====
+       封面放大仅 PC 宽屏生效；手机恢复 84x110 / 书名 16px / 信息 13px，Kindle 端不受影响。 */
+    #bookList .book-item .coverUrl {
+        width: 84px;
+        height: 110px;
+        margin-top: 2px;
+    }
+    #bookList .book-info p {
+        font-size: 13px;
+        line-height: 1.15;
+        margin: 1px 0;
+    }
+    #bookList .book-info .bookname {
+        font-size: 16px;
+    }
+
+    /* ===== r35-1) 字体选择框与字号/字距/行距输入框长宽一致 =====
+       统一宽度=calc(100% - 76px)(与.form-label对齐后的输入区等宽)，最大宽度与数字框一致(170px)；
+       高度沿用.form-control(38px)。字体框与「加粗」同处一行(font-selector nowrap)。 */
+    #fontFamily {
+        width: 100%;
+        max-width: 170px;
+    }
+
+    /* ===== r50) 关于本机弹窗放大 1/4（相对 r35-2 缩小态放大；值列允许换行避免长文本被裁）=====
+       仅手机/其他浏览器；Kindle 端保持原尺寸不变。 */
+    .xread-browser .about-modal .about-content{
+        width: 84%;
+        padding: 19px 15px 14px;
+        border-width: 4px;
+    }
+    .xread-browser .about-modal .about-heading{
+        font-size: 23px;
+        margin-bottom: 8px;
+        padding-bottom: 8px;
+    }
+    .xread-browser .about-modal .about-row{
+        font-size: 18px;
+        line-height: 33px;
+    }
+    .xread-browser .about-modal .about-label{ width: 98px; white-space: nowrap; }
+    .xread-browser .about-modal .about-value{ width: calc(100% - 98px); white-space: normal; word-break: break-all; }
+    .xread-browser .about-modal .about-footnote{ font-size: 18px; margin-top: 10px; }
+
+    /* ===== r35-3) 登录页对齐附件4（XRead 手机端显示效果，纯色卡片无玻璃模糊）=====
+       附件4为 414x736 逻辑分辨率：卡片宽≈88%，标题≈28px，输入框≈16px字/44px高，
+       按钮≈317px宽/43px高。输入框字号保持 16px（≥iOS Safari 16px 聚焦缩放阈值）。 */
+    .login-content {
+        width: 88%;
+        max-width: 388px;
+        margin: 15% auto 16px;
+        padding: 16px 18px 14px;
+        border-width: 3px;
+        border-radius: 22px;
+        -webkit-border-radius: 22px;
+        background-color: #F2F3F5;
+    }
+    .login-logo { width: 60px; height: 60px; }
+    .login-content .login-title { font-size: 28px; }
+    .login-content .login-subtitle { font-size: 16px; margin-bottom: 10px; }
+    .login-content .login-field-label { font-size: 16px; margin-bottom: 3px; }
+    .login-content .form-control {
+        font-size: 16px;
+        height: 44px;
+        border-radius: 10px;
+        -webkit-border-radius: 10px;
+    }
+    .login-content .button-group { margin-top: 12px; }
+    .login-content .btn-primary {
+        font-size: 18px;
+        height: 44px;
+        border-radius: 10px;
+        -webkit-border-radius: 10px;
+    }
+    .login-content .login-footer { font-size: 15px; margin-top: 10px; }
+
+    /* ===== r36-1) 登录输入框焦点轮廓对齐附件4（浅蓝细边框 + 柔和阴影，去掉 iOS 原生蓝色发光）=====
+       附件4密码框聚焦为浅蓝细边(#7BA6F8) + 极淡蓝光；原生 outline 在 iOS 上是粗蓝发光，去掉后自定义。 */
+    .login-content .form-control:focus {
+        outline: none;
+        -webkit-outline: none;
+        outline-style: none;
+        border-color: #7BA6F8;
+        -webkit-box-shadow: 0 0 0 3px rgba(59, 124, 246, 0.15);
+        box-shadow: 0 0 0 3px rgba(59, 124, 246, 0.15);
+    }
+
+    /* ===== r36-1b) 登录卡片半透明 + 背景模糊，透出水墨画（附件4效果，Kindle 端不受影响）===== */
+    .login-content {
+        background-color: rgba(242, 243, 245, 0.72);
+        border-color: rgba(255, 255, 255, 0.55);
+        -webkit-backdrop-filter: blur(12px);
+        backdrop-filter: blur(12px);
+    }
+
+    /* ===== r36-2) 书架右侧遮挡修正 =====
+       根因：#kindle 原为 width:100% + padding:20px + content-box，总宽=视口+40px，
+       右侧 40px 被裁出屏幕（附件3：右列书籍看不到边缘）。手机端改 border-box，
+       让 100% 宽度含 padding，内部 #content/书架右边界回到视口内。
+       Kindle 端保持原 content-box（那 20px 是为去掉 KPW3 滚动条），不受影响。 */
+    #kindle {
+        box-sizing: border-box;
+        -webkit-box-sizing: border-box;
+    }
+    #bookList {
+        width: calc(100% - 12px);
+        margin: 0 6px;
+        padding: 0;
+        box-sizing: border-box;
+        -webkit-box-sizing: border-box;
+    }
+
+    /* ===== r36-3) 加粗复选框缩小：去掉 20px 巨量 padding，避免大框遮挡"加粗"文字 ===== */
+    .bold-control .checkbox-control,
+    .font-selector .checkbox-control {
+        padding: 0;
+        width: 14px;
+        height: 14px;
+        margin: 0 4px 0 0;
+        vertical-align: middle;
+    }
+
+    /* ===== r36-5) 全屏(PWA standalone / viewport-fit=cover)顶部安全区：
+       给正文容器加顶部内边距，避免状态栏/刘海遮住章节标题。
+       text-measurer 会从 contentElement 复制 paddingTop，分页测量同步，不会错页。 ===== */
+    #bookContent {
+        padding-top: env(safe-area-inset-top, 0px);
+    }
+    #topMenu {
+        padding-top: env(safe-area-inset-top, 0px);
+        height: auto;
+        -webkit-box-sizing: border-box;
+        box-sizing: border-box;
+    }
+
+    /* r37-1) 登录卡片垂直居中（附件1）
+       .c_login 铺满视口，JS 用 inline display:block 显示，故用属性选择器 + !important 覆盖为 flex；
+       卡片 margin 归零由 flex 居中。保留 overflow:auto，键盘弹出/矮屏内容超高仍可滚动不被裁。 */
+    .c_login[style*="block"] {
+        display: -webkit-flex !important;
+        display: flex !important;
+        -webkit-align-items: center;
+        align-items: center;
+        -webkit-justify-content: center;
+        justify-content: center;
+    }
+    .login-content {
+        margin: auto;
+    }
+
+    /* ===== r37-2) 书架贴近屏幕边缘（附件2）=====
+       手机端去掉 #kindle 的 20px 内边距（那是 Kindle 去滚动条用的），
+       #bookList 左右 margin 归零，仅留极窄边框缝隙。Kindle 端不受影响。 */
+    #kindle {
+        padding-left: 4px;
+        padding-right: 4px;
+    }
+    #bookList {
+        width: 100%;
+        margin: 0;
+    }
+
+    /* ===== r37-3) 设置页「关于本机」入口缩小 + 灰色淡化，不用太起眼 ===== */
+    .about-entry {
+        font-size: 16px;
+        color: #999;
+        border-top: 0;
+    }
+
+    /* ===== r37-4) 阅读页上下弹出菜单按钮缩小适配手机（附件4）=====
+       图标 64->40px、文字 23->16px、菜单高 120->76px、按钮区收紧，
+       让一屏能显示更多正文，点出的顶/底菜单更轻巧。Kindle 端不受影响。 */
+    .top-menu, .bottom-menu, #topMenu, #bottomMenu {
+        height: 76px;
+        border-bottom-width: 4px;
+        border-top-width: 4px;
+    }
+    .top-menu button, .bottom-menu button {
+        height: 76px;
+        width: 110px;
+        font-size: 34px;
+    }
+    .icon-button {
+        padding: 3px 8px;
+    }
+    .menu-icon {
+        width: 40px;
+        height: 40px;
+        margin: 0 auto 2px;
+    }
+    .menu-text {
+        font-size: 16px;
+    }
+    .top-menu-left, .top-menu-right, .top-menu-middle,
+    .bottom-menu-left, .bottom-menu-right, .bottom-menu-middle {
+        padding-bottom: 4px;
+        padding-top: 4px;
+    }
+
+    /* ===== r38-1) 目录页/设置页关闭按钮缩小 =====
+       原 .close 为 85px 字号 + 50x50px 白底方块，手机上过大（截图里 × 占满右上角）。
+       统一缩小到 52px 字号 + 36x36px，目录/设置/关于三处通用，仍保留白底与可点区域。 */
+    .close, .about-modal .about-close {
+        font-size: 52px;
+        width: 36px;
+        height: 36px;
+        top: 4px;
+        right: 10px;
+        line-height: 36px;
+    }
+
+    /* ===== r38-2) 设置页美化：字号/行距/布局收紧，整体更紧凑协调 =====
+       仅手机端；Kindle 端保持原样。 */
+    .config-content h2 {
+        font-size: 20px;
+        padding: 6px 0;
+        margin: 8px 0 6px;
+    }
+    .config-content .form-row {
+        margin-bottom: 10px;
+    }
+    .config-content .input-wrapper .form-control {
+        height: 38px;
+    }
+    .page-turning-content-cell { margin-top: 6px; }
+    .page-option { margin: 4px 1%; }
+    .page-image { height: 64px; }
+    .page-radio { margin-top: 4px; }
+    .book-mgmt-buttons .book-mgmt-btn { height: 38px; line-height: 38px; }
+
+    /* ===== r38-3) 上下菜单再整体缩小一点 =====
+       在 r37 基础上：菜单高 76->66px、图标 40->34px、文字 16->14px、按钮字号 34->30px。 */
+    .top-menu, .bottom-menu, #topMenu, #bottomMenu {
+        height: 66px;
+    }
+    .top-menu button, .bottom-menu button {
+        height: 66px;
+        width: 100px;
+        font-size: 30px;
+    }
+    .menu-icon {
+        width: 34px;
+        height: 34px;
+    }
+    .menu-text {
+        font-size: 14px;
+    }
+
+    /* ===== r39-1) 登录提示文字缩小 + 颜色变浅（降低视觉权重）=====
+       副标题「登录以同步你的阅读数据」与底部「没有账号？ 注册」都更小更浅。
+       注册链接保留蓝色强调色（功能入口），仅缩小字号。 */
+    .login-content .login-subtitle { font-size: 14px; color: #9AA3AF; }
+    .login-content .login-footer { font-size: 13px; color: #AAB2BD; }
+    .login-content .login-footer-text { color: #AAB2BD; }
+    .login-content .login-footer-link { font-size: 13px; }
+
+    /* ===== r39-2) 目录页码行 flex 化：压缩按钮/页码间距，页码「12/88」完整显示不溢出；
+       目录条目加省略号，长标题优雅截断，不再硬裁半字。 ===== */
+    .modal-menu {
+        display: -webkit-flex; display: flex;
+        -webkit-flex-wrap: nowrap; flex-wrap: nowrap;
+        -webkit-align-items: center; align-items: center;
+        -webkit-justify-content: space-between; justify-content: space-between;
+        white-space: nowrap;
+    }
+    .modal-menu-left, .modal-menu-right {
+        float: none;
+        display: -webkit-flex; display: flex;
+        -webkit-align-items: center; align-items: center;
+        -webkit-flex-wrap: nowrap; flex-wrap: nowrap;
+    }
+    .modal-menu button {
+        min-width: 0;
+        margin-right: 4px;
+        padding: 4px 8px;
+        font-size: 15px;
+        height: 34px;
+        line-height: 1;
+        white-space: nowrap;
+    }
+    .modal-menu .page-info {
+        display: inline;
+        width: auto;
+        min-width: 0;
+        font-size: 15px;
+        line-height: 1;
+        margin: 0 2px;
+    }
+    .modal-column button {
+        text-overflow: ellipsis;
+        -o-text-overflow: ellipsis;
+    }
+}
+
+
+/* =====================================================================
+   r39-3) PC 浏览器适配（.xread-browser 作用域）
+   ---------------------------------------------------------------------
+   以下内容是上方 max-width:700 主块的等价副本，仅给每条选择器加了
+   .xread-browser 前缀。UA 检测脚本已给所有「非 Kindle」浏览器（手机/PC/
+   Windows）<html> 加上该 class，因此：
+     · 手机：新旧两处都命中且值相同，无变化；
+     · PC/宽屏浏览器：仅本副本命中，复用整套紧凑适配（解决登录/书架/
+       正文/设置页字号过大）；
+     · Kindle PW7：无 class，新旧两处都不命中 → 完全保持 kindle.css 原样。
+   维护提示：改主块样式时，本副本需同步（二者值应保持一致）。
+   ===================================================================== */
+
+    /* 1) 设置页标签:固定像素给足宽度,避免"字体/字号/字距/行距"被输入框遮挡 */
+    .xread-browser .config-content .form-label{
+        width: 76px;
+        font-size: 22px;
+        padding-right: 6px;
+    }
+    .xread-browser .config-content .input-wrapper{
+        width: calc(100% - 76px);
+    }
+    /* 数字框宽度沿用原始写法（已回退三问题hack） */
+    /* 加粗选项缩进收敛,避免窄屏被挤到下一行 */
+    .xread-browser .bold-control{
+        margin-left: 12px;
+    }
+    /* 2) 翻页四图一行:每选项 22% + 左右 1% 边距 */
+    .xread-browser .page-option{
+        width: 22%;
+        margin: 5px 1%;
+    }
+    .xread-browser .page-image{
+        height: 96px;
+    }
+    /* 3) 关于本机:加宽卡片 + 值列不换行,设备名称/服务端版本单行显示 */
+    .xread-browser .about-modal .about-content{
+        width: 96%;
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+    .xread-browser .about-modal .about-row{
+        font-size: 17px;
+    }
+    .xread-browser .about-modal .about-label{
+        width: 92px;
+    }
+    .xread-browser .about-modal .about-value{
+        width: calc(100% - 92px);
+        white-space: nowrap;
+    }
+    /* 4) 弹窗：手机上内容超高时允许内部滚动到底（书籍管理/关于本机）；
+          遮罩贴合视口、卡片左右留白，避免关闭按钮和「加粗」被裁出屏幕。
+          仅在 max-width:700 媒体查询内生效，Kindle PW7 视口 1000+ 不受影响。 */
+    .xread-browser .modal{
+        margin-left: 0;
+        padding-top: 10px;
+        width: 100%;
+    }
+    .xread-browser .modal-content{
+        width: 92%;
+        max-height: 94%;
+        overflow-x: hidden;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        box-sizing: border-box;
+        -webkit-box-sizing: border-box;
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+    /* 5) 手机端整体字号收敛：目录/设置弹窗内容在 iPhone 上偏大，统一缩小一档。
+         均在 max-width:700 媒体查询内，Kindle PW7 视口 1000+ 不受影响。 */
+    .xread-browser .modal-title, .xread-browser #chapterTitle{
+        font-size: 32px;
+        margin: 10px 0 8px 40px;
+    }
+    .xread-browser .modal-column button{
+        font-size: 28px;
+        line-height: 1.2;
+        padding: 2px 4px;
+        margin: 4px 0;
+    }
+    .xread-browser .config-content h2{
+        font-size: 28px;
+        padding: 8px 0;
+        margin: 8px 0;
+    }
+    .xread-browser .config-content .form-label, .xread-browser .bold-label{
+        font-size: 22px;
+    }
+    .xread-browser .number-input, .xread-browser .form-control, .xread-browser select, .xread-browser input{
+        font-size: 24px;
+        height: 42px;
+    }
+    .xread-browser .page-image{
+        height: 80px;
+    }
+    .xread-browser .menu-icon{
+        width: 52px;
+        height: 52px;
+    }
+    .xread-browser .menu-text{
+        font-size: 20px;
+    }
+    .xread-browser .top-menu button, .xread-browser .bottom-menu button{
+        font-size: 40px;
+        height: 100px;
+    }
+    .xread-browser .top-menu, .xread-browser .bottom-menu{
+        height: 100px;
+    }
+    .xread-browser .modal-menu button, .xread-browser .modal-menu input, .xread-browser .modal-menu .page-info{
+        font-size: 28px;
+        height: 50px;
+        line-height: 1.2;
+        min-width: 80px;
+        padding: 8px 10px;
+        margin-right: 20px;
+    }
+    /* 6) 三弹窗样式统一（仅手机端）：目录页去掉额外 padding，左右边框与设置页对齐；
+          关于本机复用设置页的黑框 + 内部滚动方案，三者左右留白一致、都能滚动看全。
+          Kindle PW7 视口 1000+ 不触发本媒体查询，保持原样。 */
+    .xread-browser .bookChapterList{
+        padding: 0;
+    }
+    .xread-browser .about-modal .about-content{
+        width: 92%;
+        max-width: none;
+        max-height: 94%;
+        margin: 0 auto;
+        padding: 20px 16px 15px;
+        background: #FFF;
+        border: 4px solid #000;
+        border-radius: 4px;
+        -webkit-border-radius: 4px;
+        overflow-x: hidden;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        box-sizing: border-box;
+        -webkit-box-sizing: border-box;
+    }
+    /* 7) 内容字号再缩一档：设置页/目录页文字在 iPhone 上仍偏大 */
+    .xread-browser .modal-title, .xread-browser #chapterTitle{
+        font-size: 26px;
+    }
+    .xread-browser .modal-column button{
+        font-size: 22px;
+    }
+    .xread-browser .modal-menu button, .xread-browser .modal-menu input, .xread-browser .modal-menu .page-info{
+        font-size: 22px;
+        height: 44px;
+    }
+    .xread-browser .config-content h2{
+        font-size: 24px;
+    }
+    .xread-browser .config-content .form-label, .xread-browser .bold-label{
+        font-size: 18px;
+    }
+    .xread-browser .number-input, .xread-browser .form-control, .xread-browser select, .xread-browser input{
+        font-size: 20px;
+        height: 38px;
+    }
+    .xread-browser .menu-text{
+        font-size: 18px;
+    }
+    .xread-browser .about-modal .about-heading{
+        font-size: 26px;
+    }
+    .xread-browser .about-modal .about-row{
+        font-size: 16px;
+        line-height: 34px;
+    }
+    /* 8) 登录页字号放大，对齐 XRead 参考（同条件截图）；仅手机端，Kindle 基线不动。
+         输入框 34px 远大于 iOS Safari 的 16px 聚焦缩放阈值，不会触发自动放大。 */
+    .xread-browser .login-content{
+        width: 94%;
+    }
+    .xread-browser .login-logo{
+        width: 80px;
+        height: 80px;
+    }
+    .xread-browser .login-content .login-title{
+        font-size: 46px;
+    }
+    .xread-browser .login-content .login-subtitle{
+        font-size: 26px;
+    }
+    .xread-browser .login-content .login-field-label{
+        font-size: 32px;
+    }
+    .xread-browser .login-content .form-control{
+        font-size: 34px;
+        height: 64px;
+    }
+    .xread-browser .login-content .btn-primary{
+        font-size: 36px;
+        height: 66px;
+    }
+    .xread-browser .login-content .login-footer{
+        font-size: 30px;
+    }
+    /* 9) 目录翻页控件一行：左右两组改 inline-block + nowrap，缩小按钮 */
+    .xread-browser .modal-menu{ white-space: nowrap; text-align: center; }
+    .xread-browser .modal-menu-left, .xread-browser .modal-menu-right{ float: none; display: inline-block; vertical-align: middle; }
+    .xread-browser .modal-menu button{ min-width: 56px; margin-right: 10px; padding: 6px 8px; font-size: 18px; height: 40px; }
+    .xread-browser .modal-menu .page-info{ font-size: 18px; line-height: 1.2; }
+    /* 10) 字体下拉框与「加粗」同行 */
+    .xread-browser .font-selector{ white-space: nowrap; }
+    .xread-browser .bold-control{ margin-left: 8px; }
+    /* 11) 三弹窗垂直居中：JS 用 inline display:block，此处用属性选择器 + !important 覆盖为 flex；
+         内容超高时子项 margin:auto 归零，仍可滚动看全、不裁切顶部 */
+    .xread-browser .modal[style*="block"]{
+        display: -webkit-flex !important;
+        display: flex !important;
+        -webkit-align-items: flex-start;
+        align-items: flex-start;
+        -webkit-justify-content: center;
+        justify-content: center;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+    .xread-browser .modal > .modal-content, .xread-browser .about-modal .about-content{
+        margin-top: auto !important;
+        margin-bottom: auto !important;
+    }
+    /* 12) 标题类字号（正文类统一见下方【统一字号入口】） */
+    .xread-browser .modal-title, .xread-browser #chapterTitle{ font-size: 24px; }
+    .xread-browser .config-content h2{ font-size: 22px; }
+    .xread-browser .menu-text{ font-size: 17px; }
+    .xread-browser .about-modal .about-heading{ font-size: 24px; }
+
+    /* ===== 【统一字号入口】设置页标签 / 字号·字距·行距数字框 / 加粗、
+       书籍管理按钮、关于页内容、目录条目，统一在这里调整：
+       只改下面 font-size 的值，以上元素一起变，无需再逐条找。
+       登录页输入框为规避 iOS 聚焦缩放采用独立大字号，不在本组。
+       仅手机/其他浏览器（max-width:700）生效，Kindle PW7 视口 1000+ 不受影响。 ===== */
+    .xread-browser .config-content .form-label,.xread-browser .bold-label,.xread-browser .config-content .number-input,.xread-browser .book-mgmt-buttons .book-mgmt-btn,.xread-browser .book-mgmt-line,.xread-browser .book-mgmt-inline,.xread-browser .book-mgmt-select,.xread-browser .about-modal .about-row,.xread-browser .modal-column button{
+        font-size: 18px;
+    }
+
+    /* ===== 书架封面放大（仅 PC 宽屏 >=701px）=====
+       用 min-width:701 限定：手机(<701)不命中、保持主块 84x110；Kindle 无 class 不受影响。 */
+    @media (min-width: 701px) {
+    .xread-browser #bookList .book-item .coverUrl{
+        width: 120px;
+        height: 157px;
+        margin-top: 3px;
+    }
+    .xread-browser #bookList .book-info p{
+        font-size: 14px;
+        line-height: 1.15;
+        margin: 1px 0;
+    }
+    .xread-browser #bookList .book-info .bookname{
+        font-size: 18px;
+    }
+    }
+
+    /* ===== r35-1) 字体选择框与字号/字距/行距输入框长宽一致 =====
+       统一宽度=calc(100% - 76px)(与.form-label对齐后的输入区等宽)，最大宽度与数字框一致(170px)；
+       高度沿用.form-control(38px)。字体框与「加粗」同处一行(font-selector nowrap)。 */
+    .xread-browser #fontFamily{
+        width: 100%;
+        max-width: 170px;
+    }
+
+    /* ===== r50) 关于本机弹窗放大 1/4（相对 r35-2 缩小态放大；值列允许换行避免长文本被裁）=====
+       仅手机/其他浏览器；Kindle 端保持原尺寸不变。 */
+    .xread-browser .about-modal .about-content{
+        width: 84%;
+        padding: 19px 15px 14px;
+        border-width: 4px;
+    }
+    .xread-browser .about-modal .about-heading{
+        font-size: 23px;
+        margin-bottom: 8px;
+        padding-bottom: 8px;
+    }
+    .xread-browser .about-modal .about-row{
+        font-size: 18px;
+        line-height: 33px;
+    }
+    .xread-browser .about-modal .about-label{ width: 98px; white-space: nowrap; }
+    .xread-browser .about-modal .about-value{ width: calc(100% - 98px); white-space: normal; word-break: break-all; }
+    .xread-browser .about-modal .about-footnote{ font-size: 18px; margin-top: 10px; }
+
+    /* ===== r35-3) 登录页对齐附件4（XRead 手机端显示效果，纯色卡片无玻璃模糊）=====
+       附件4为 414x736 逻辑分辨率：卡片宽≈88%，标题≈28px，输入框≈16px字/44px高，
+       按钮≈317px宽/43px高。输入框字号保持 16px（≥iOS Safari 16px 聚焦缩放阈值）。 */
+    .xread-browser .login-content{
+        width: 88%;
+        max-width: 388px;
+        margin: 15% auto 16px;
+        padding: 16px 18px 14px;
+        border-width: 3px;
+        border-radius: 22px;
+        -webkit-border-radius: 22px;
+        background-color: #F2F3F5;
+    }
+    .xread-browser .login-logo{ width: 60px; height: 60px; }
+    .xread-browser .login-content .login-title{ font-size: 28px; }
+    .xread-browser .login-content .login-subtitle{ font-size: 16px; margin-bottom: 10px; }
+    .xread-browser .login-content .login-field-label{ font-size: 16px; margin-bottom: 3px; }
+    .xread-browser .login-content .form-control{
+        font-size: 16px;
+        height: 44px;
+        border-radius: 10px;
+        -webkit-border-radius: 10px;
+    }
+    .xread-browser .login-content .button-group{ margin-top: 12px; }
+    .xread-browser .login-content .btn-primary{
+        font-size: 18px;
+        height: 44px;
+        border-radius: 10px;
+        -webkit-border-radius: 10px;
+    }
+    .xread-browser .login-content .login-footer{ font-size: 15px; margin-top: 10px; }
+
+    /* ===== r36-1) 登录输入框焦点轮廓对齐附件4（浅蓝细边框 + 柔和阴影，去掉 iOS 原生蓝色发光）=====
+       附件4密码框聚焦为浅蓝细边(#7BA6F8) + 极淡蓝光；原生 outline 在 iOS 上是粗蓝发光，去掉后自定义。 */
+    .xread-browser .login-content .form-control:focus{
+        outline: none;
+        -webkit-outline: none;
+        outline-style: none;
+        border-color: #7BA6F8;
+        -webkit-box-shadow: 0 0 0 3px rgba(59, 124, 246, 0.15);
+        box-shadow: 0 0 0 3px rgba(59, 124, 246, 0.15);
+    }
+
+    /* ===== r36-1b) 登录卡片半透明 + 背景模糊，透出水墨画（附件4效果，Kindle 端不受影响）===== */
+    .xread-browser .login-content{
+        background-color: rgba(242, 243, 245, 0.72);
+        border-color: rgba(255, 255, 255, 0.55);
+        -webkit-backdrop-filter: blur(12px);
+        backdrop-filter: blur(12px);
+    }
+
+    /* ===== r36-2) 书架右侧遮挡修正 =====
+       根因：#kindle 原为 width:100% + padding:20px + content-box，总宽=视口+40px，
+       右侧 40px 被裁出屏幕（附件3：右列书籍看不到边缘）。手机端改 border-box，
+       让 100% 宽度含 padding，内部 #content/书架右边界回到视口内。
+       Kindle 端保持原 content-box（那 20px 是为去掉 KPW3 滚动条），不受影响。 */
+    .xread-browser #kindle{
+        box-sizing: border-box;
+        -webkit-box-sizing: border-box;
+    }
+    .xread-browser #bookList{
+        width: calc(100% - 12px);
+        margin: 0 6px;
+        padding: 0;
+        box-sizing: border-box;
+        -webkit-box-sizing: border-box;
+    }
+
+    /* ===== r36-3) 加粗复选框缩小：去掉 20px 巨量 padding，避免大框遮挡"加粗"文字 ===== */
+    .xread-browser .bold-control .checkbox-control,.xread-browser .font-selector .checkbox-control{
+        padding: 0;
+        width: 14px;
+        height: 14px;
+        margin: 0 4px 0 0;
+        vertical-align: middle;
+    }
+
+    /* ===== r36-5) 全屏(PWA standalone / viewport-fit=cover)顶部安全区：
+       给正文容器加顶部内边距，避免状态栏/刘海遮住章节标题。
+       text-measurer 会从 contentElement 复制 paddingTop，分页测量同步，不会错页。 ===== */
+    .xread-browser #bookContent{
+        padding-top: env(safe-area-inset-top, 0px);
+    }
+    .xread-browser #topMenu{
+        padding-top: env(safe-area-inset-top, 0px);
+        height: auto;
+        -webkit-box-sizing: border-box;
+        box-sizing: border-box;
+    }
+
+    /* r37-1) 登录卡片垂直居中（附件1）
+       .c_login 铺满视口，JS 用 inline display:block 显示，故用属性选择器 + !important 覆盖为 flex；
+       卡片 margin 归零由 flex 居中。保留 overflow:auto，键盘弹出/矮屏内容超高仍可滚动不被裁。 */
+    .xread-browser .c_login[style*="block"]{
+        display: -webkit-flex !important;
+        display: flex !important;
+        -webkit-align-items: center;
+        align-items: center;
+        -webkit-justify-content: center;
+        justify-content: center;
+    }
+    .xread-browser .login-content{
+        margin: auto;
+    }
+
+    /* ===== r37-2) 书架贴近屏幕边缘（附件2）=====
+       手机端去掉 #kindle 的 20px 内边距（那是 Kindle 去滚动条用的），
+       #bookList 左右 margin 归零，仅留极窄边框缝隙。Kindle 端不受影响。 */
+    .xread-browser #kindle{
+        padding-left: 4px;
+        padding-right: 4px;
+    }
+    .xread-browser #bookList{
+        width: 100%;
+        margin: 0;
+    }
+
+    /* ===== r37-3) 设置页「关于本机」入口缩小 + 灰色淡化，不用太起眼 ===== */
+    .xread-browser .about-entry{
+        font-size: 16px;
+        color: #999;
+        border-top: 0;
+    }
+
+    /* ===== r37-4) 阅读页上下弹出菜单按钮缩小适配手机（附件4）=====
+       图标 64->40px、文字 23->16px、菜单高 120->76px、按钮区收紧，
+       让一屏能显示更多正文，点出的顶/底菜单更轻巧。Kindle 端不受影响。 */
+    .xread-browser .top-menu, .xread-browser .bottom-menu, .xread-browser #topMenu, .xread-browser #bottomMenu{
+        height: 76px;
+        border-bottom-width: 4px;
+        border-top-width: 4px;
+    }
+    .xread-browser .top-menu button, .xread-browser .bottom-menu button{
+        height: 76px;
+        width: 110px;
+        font-size: 34px;
+    }
+    .xread-browser .icon-button{
+        padding: 3px 8px;
+    }
+    .xread-browser .menu-icon{
+        width: 40px;
+        height: 40px;
+        margin: 0 auto 2px;
+    }
+    .xread-browser .menu-text{
+        font-size: 16px;
+    }
+    .xread-browser .top-menu-left, .xread-browser .top-menu-right, .xread-browser .top-menu-middle,.xread-browser .bottom-menu-left, .xread-browser .bottom-menu-right, .xread-browser .bottom-menu-middle{
+        padding-bottom: 4px;
+        padding-top: 4px;
+    }
+
+    /* ===== r38-1) 目录页/设置页关闭按钮缩小 =====
+       原 .close 为 85px 字号 + 50x50px 白底方块，手机上过大（截图里 × 占满右上角）。
+       统一缩小到 52px 字号 + 36x36px，目录/设置/关于三处通用，仍保留白底与可点区域。 */
+    .xread-browser .close, .xread-browser .about-modal .about-close{
+        font-size: 52px;
+        width: 36px;
+        height: 36px;
+        top: 4px;
+        right: 10px;
+        line-height: 36px;
+    }
+
+    /* ===== r38-2) 设置页美化：字号/行距/布局收紧，整体更紧凑协调 =====
+       仅手机端；Kindle 端保持原样。 */
+    .xread-browser .config-content h2{
+        font-size: 20px;
+        padding: 6px 0;
+        margin: 8px 0 6px;
+    }
+    .xread-browser .config-content .form-row{
+        margin-bottom: 10px;
+    }
+    .xread-browser .config-content .input-wrapper .form-control{
+        height: 38px;
+    }
+    .xread-browser .page-turning-content-cell{ margin-top: 6px; }
+    .xread-browser .page-option{ margin: 4px 1%; }
+    .xread-browser .page-image{ height: 64px; }
+    .xread-browser .page-radio{ margin-top: 4px; }
+    .xread-browser .book-mgmt-buttons .book-mgmt-btn{ height: 38px; line-height: 38px; }
+
+    /* ===== r38-3) 上下菜单再整体缩小一点 =====
+       在 r37 基础上：菜单高 76->66px、图标 40->34px、文字 16->14px、按钮字号 34->30px。 */
+    .xread-browser .top-menu, .xread-browser .bottom-menu, .xread-browser #topMenu, .xread-browser #bottomMenu{
+        height: 66px;
+    }
+    .xread-browser .top-menu button, .xread-browser .bottom-menu button{
+        height: 66px;
+        width: 100px;
+        font-size: 30px;
+    }
+    .xread-browser .menu-icon{
+        width: 34px;
+        height: 34px;
+    }
+    .xread-browser .menu-text{
+        font-size: 14px;
+    }
+
+    /* ===== r39-1) 登录提示文字缩小 + 颜色变浅（降低视觉权重）=====
+       副标题「登录以同步你的阅读数据」与底部「没有账号？ 注册」都更小更浅。
+       注册链接保留蓝色强调色（功能入口），仅缩小字号。 */
+    .xread-browser .login-content .login-subtitle{ font-size: 14px; color: #9AA3AF; }
+    .xread-browser .login-content .login-footer{ font-size: 13px; color: #AAB2BD; }
+    .xread-browser .login-content .login-footer-text{ color: #AAB2BD; }
+    .xread-browser .login-content .login-footer-link{ font-size: 13px; }
+
+    /* ===== r39-2) 目录页码行 flex 化：压缩按钮/页码间距，页码「12/88」完整显示不溢出；
+       目录条目加省略号，长标题优雅截断，不再硬裁半字。 ===== */
+    .xread-browser .modal-menu{
+        display: -webkit-flex; display: flex;
+        -webkit-flex-wrap: nowrap; flex-wrap: nowrap;
+        -webkit-align-items: center; align-items: center;
+        -webkit-justify-content: space-between; justify-content: space-between;
+        white-space: nowrap;
+    }
+    .xread-browser .modal-menu-left, .xread-browser .modal-menu-right{
+        float: none;
+        display: -webkit-flex; display: flex;
+        -webkit-align-items: center; align-items: center;
+        -webkit-flex-wrap: nowrap; flex-wrap: nowrap;
+    }
+    .xread-browser .modal-menu button{
+        min-width: 0;
+        margin-right: 4px;
+        padding: 4px 8px;
+        font-size: 15px;
+        height: 34px;
+        line-height: 1;
+        white-space: nowrap;
+    }
+    .xread-browser .modal-menu .page-info{
+        display: inline;
+        width: auto;
+        min-width: 0;
+        font-size: 15px;
+        line-height: 1;
+        margin: 0 2px;
+    }
+    .xread-browser .modal-column button{
+        text-overflow: ellipsis;
+        -o-text-overflow: ellipsis;
+    }
+
+
+/* =====================================================================
+   r40) 目录末行同行+贴底边 / PC 弹窗尺寸收敛
+   ---------------------------------------------------------------------
+   平铺 .xread-browser 作用域：手机与 PC 浏览器（都带该 class）同时生效；
+   Kindle 无 class → 完全保持 kindle.css 原样。
+   ===================================================================== */
+
+/* ---- r40-1) 目录末行：按钮与页码统一高度/padding/垂直对齐，严格同一行 ----
+       r41) 页码「数字 / 数字」间隙收紧：padding 6->2px、margin 2->1px，
+            数字↔斜杠的字面间隙 16px -> 6px（按钮不变，避免误伤「下一页」间距）。 ---- */
+.xread-browser .modal-menu button {
+    height: 30px;
+    line-height: 28px;
+    padding: 0 6px;
+    margin: 0 2px;
+    font-size: 15px;
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    vertical-align: middle;
+}
+.xread-browser .modal-menu .page-info {
+    height: 30px;
+    line-height: 28px;
+    padding: 0 2px;
+    margin: 0 1px;
+    font-size: 15px;
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    vertical-align: middle;
+}
+.xread-browser .modal-menu .page-info {
+    display: inline-block;
+}
+.xread-browser .modal-menu-left,
+.xread-browser .modal-menu-right {
+    height: 32px;
+}
+
+/* ---- r40-1b) 末行贴近弹窗底边：收紧菜单上下间距与弹窗底部内边距 ---- */
+.xread-browser .modal-menu {
+    margin-top: 6px;
+    margin-bottom: 0;
+    padding-top: 6px;
+    min-height: 32px;
+    height: auto;
+}
+.xread-browser .modal > .modal-content {
+    padding-bottom: 8px;
+}
+
+/* ---- r40-2) PC 弹窗过长过宽：限制最大宽度，宽屏下不再拉满到 90%(1300px+) ----
+       手机弹窗宽约 381px < 680px，不受影响，维持原紧凑布局。 ---- */
+.xread-browser .modal > .modal-content {
+    max-width: 680px;
+}
+
+/* =====================================================================
+   r43) PC 适配修正（仅 .xread-browser 非 Kindle 端）
+   ---------------------------------------------------------------------
+   ① 关于本机弹窗：PC 宽屏下 69% 宽度过宽(约994px+)，限宽让信息区紧凑；
+   ② 滚动条：隐藏页面/容器滚动条但保留滚动能力，消除右侧/底部进度条占位；
+   ③ 菜单左右对称：原 .menu margin 左30右15，右侧按钮贴边(right=0)，统一为左右15px。
+   Kindle 端无 .xread-browser class，本块规则均不命中，完全保持原样。
+   ===================================================================== */
+
+/* ① about 弹窗 PC 限宽：只约束宽度，不动字体/配色，手机端(<701)不受影响 */
+@media (min-width: 701px) {
+    .xread-browser .about-modal .about-content {
+        width: auto;
+        max-width: 560px;
+    }
+}
+
+/* ③ 菜单左右对称：左右统一 15px，右侧按钮不再贴死屏幕边 */
+.xread-browser .menu {
+    margin-left: 15px;
+    margin-right: 15px;
+}
+.xread-browser .top-menu-right,
+.xread-browser .bottom-menu-right {
+    margin-right: 15px;
+}
+
+/* ② 隐藏滚动条（保留滚动）：非 Kindle 全端生效，消除右侧竖向/底部横向进度条 */
+.xread-browser, .xread-browser * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.xread-browser::-webkit-scrollbar,
+.xread-browser *::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+    -webkit-appearance: none;
+}
+.xread-browser body {
+    overflow-x: hidden;
+}
+
+/* =====================================================================
+   r44) 手机菜单左右图标距边缘对称（真机 iPhone Safari 实测修正）
+   ---------------------------------------------------------------------
+   r44b) 修正：上版左5/右25 导致真机右侧按钮距边明显比左侧远（右侧改多了）。
+   现左右统一为 15px —— margin 相等即从 CSS 层面保证两侧图标距屏幕边缘一致，
+   彻底消除 float 方向性渲染差异。仅手机端(@media max-width:700 + .xread-browser)，PC/Kindle 不受影响。
+   ===================================================================== */
+@media (max-width: 700px) {
+    .xread-browser .top-menu-left,
+    .xread-browser .bottom-menu-left {
+        margin-left: 15px;
+    }
+    .xread-browser .top-menu-right,
+    .xread-browser .bottom-menu-right {
+        margin-right: 15px;
+    }
+
+    /* r44-2) 书架书籍信息字号缩小一档，行距放宽，布局更舒展 */
+    .xread-browser #bookList .book-info p {
+        font-size: 12px;
+        line-height: 1.25;
+        margin: 2px 0;
+    }
+    .xread-browser #bookList .book-info .bookname {
+        font-size: 15px;
+    }
+
+    /* r44-3) 目录书名上下留白收紧：标题上下 margin + 容器底部 margin */
+    .xread-browser #chapterTitle,
+    .xread-browser .modal-title {
+        margin: 4px 0 2px 40px;
+    }
+    .xread-browser .modal-title-container {
+        margin-bottom: 6px;
+    }
+}
+
+/* =====================================================================
+   r46 / v1.0.48.47) PC 端上下菜单按钮区域避开屏幕边缘 + 分割线（仅 PC）
+   ---------------------------------------------------------------------
+   问题(PC 1440实测)：菜单高66px但按钮区74px溢出——顶部"书架/注销"文字底压在
+   border-bottom 分割线上，底部"目录/设置"按钮区超出视口、文字贴死屏幕底边；
+   左右仅15px偏贴边。KindlePW7视口1000+但无 .xread-browser class，不受影响。
+   处理：仅 PC(min-width:701)——菜单加高到84px容纳按钮区，分割线随菜单边界下移；
+   按钮区加上下内边距使文字离分割线/屏幕边留白；左右边距 15->24px。
+   手机(max-width:700)与 Kindle 均不命中本块，保持原样。
+   ===================================================================== */
+@media (min-width: 701px) {
+    .xread-browser .top-menu, .xread-browser .bottom-menu,
+    .xread-browser #topMenu, .xread-browser #bottomMenu {
+        height: 84px;
+    }
+    .xread-browser .top-menu-left, .xread-browser .top-menu-right,
+    .xread-browser .bottom-menu-left, .xread-browser .bottom-menu-right {
+        padding-top: 8px;
+        padding-bottom: 8px;
+    }
+    .xread-browser .top-menu-left, .xread-browser .bottom-menu-left {
+        margin-left: 24px;
+    }
+    .xread-browser .top-menu-right, .xread-browser .bottom-menu-right {
+        margin-right: 24px;
+    }
+}
+
+/* r46 / v1.0.48.47) 书籍管理进度详情字号与按钮对齐(18px)：
+   把 .book-mgmt-line/.book-mgmt-inline/.book-mgmt-select 纳入上方【统一字号入口】，
+   与 .book-mgmt-btn 同为 18px。此前详情行沿用 kindle.css 的 24/22/20px，
+   在手机/PC 比按钮大。Kindle 无 .xread-browser class，不命中本文件，保持原样。 */
+
+/* =====================================================================
+   r47 / v1.0.48.47) 配置书籍 2×2 卡片：手机/PC 适配（仅 .xread-browser）
+   ---------------------------------------------------------------------
+   kindle.css 的基础卡片是为 E-ink 大视口设计（标题26/数字40/按钮24），
+   手机/PC 需整体缩小。Kindle 无 .xread-browser，不命中本块，保持原样。
+   ===================================================================== */
+.xread-browser .bm-card-hd { margin-bottom: 6px; }
+.xread-browser .bm-card-id { font-size: 13px; margin-right: 4px; }
+.xread-browser .bm-card-title { font-size: 17px; }
+.xread-browser .bm-card-value { font-size: 27px; margin: 4px 0 2px 0; }
+.xread-browser .bm-card-unit { font-size: 13px; margin-left: 2px; }
+.xread-browser .bm-card-note { font-size: 13px; margin-bottom: 8px; min-height: 18px; }
+.xread-browser .bm-card-btn { height: 38px; line-height: 34px; font-size: 15px; }
+.xread-browser .bm-card-select { height: 36px; font-size: 14px; }
+.xread-browser .bm-book-title { font-size: 16px; }
+.xread-browser .bm-book-author { font-size: 13px; margin-bottom: 6px; }
+.xread-browser .bm-status-bar { font-size: 14px; }
+.xread-browser .bm-status-row { padding-top: 8px; }
+.xread-browser .bm-status-check { font-size: 16px; margin-right: 5px; }
+/* 窄屏（≤700，手机）：两列仍保留但再缩一档，紧凑间距 */
+@media (max-width: 700px) {
+    .xread-browser .bm-card { width: 50%; padding: 10px 10px 12px 10px; }
+    .xread-browser .bm-card-row { border-spacing: 8px 0; margin: 0 -8px 10px -8px; }
+    .xread-browser .bm-card-title { font-size: 15px; }
+    .xread-browser .bm-card-value { font-size: 23px; }
+    .xread-browser .bm-card-note { font-size: 12px; margin-bottom: 6px; }
+    .xread-browser .bm-card-btn { height: 34px; line-height: 30px; font-size: 14px; }
+}
+/* 超窄屏（≤400）：改单列，避免两列内容挤压 */
+@media (max-width: 400px) {
+    .xread-browser .bm-card { width: 50%; }
+    .xread-browser .bm-card-row { border-spacing: 5px 0; margin: 0 -5px 8px -5px; }
+}
+
+/* =====================================================================
+   r51 / v1.0.48.51) 手机上下菜单按钮避开分割线与屏幕边缘
+   ---------------------------------------------------------------------
+   问题(手机414实测)：菜单高66px但按钮区(图标34+文字20+padding)约70px溢出，
+   顶部"书架/注销"文字底压在border-bottom分割线上，底部"目录/设置"文字贴死屏幕底边。
+   处理：仅手机(max-width:700 + .xread-browser)——菜单加高66->80px容纳按钮区，
+   左右容器加上下padding使文字离分割线/屏幕边留白。PC/Kindle 命中各自规则，不受影响。
+   ===================================================================== */
+@media (max-width: 700px) {
+    .xread-browser .top-menu, .xread-browser .bottom-menu,
+    .xread-browser #topMenu, .xread-browser #bottomMenu {
+        height: 86px;
+    }
+    .xread-browser .top-menu button, .xread-browser .bottom-menu button {
+        height: 86px;
+    }
+    .xread-browser .top-menu-left, .xread-browser .top-menu-right,
+    .xread-browser .bottom-menu-left, .xread-browser .bottom-menu-right {
+        padding-top: 8px;
+        padding-bottom: 8px;
+    }
+}
+
+/* =====================================================================
+   r52 / v1.0.48.53) 设置页三区块精修（仅 .xread-browser，Kindle 不命中）
+   ---------------------------------------------------------------------
+   1) 配置翻页：4 图标卡片化 + 文字标签(仿真/平移/上下/无动画) + 选中加粗黑框
+   2) 区块标题：序号 01/02/03 缩小字号 + 8px 间距节奏
+   3) 配置书籍：书名/作者同字号对齐，与 C 卡下拉框等高
+   4) 手机窄屏：关于本机 / 进度信息缩一档且每项单行显示
+   本块置于文件末尾，同优先级下覆盖上方所有重复规则。
+   ===================================================================== */
+.xread-browser .page-turning-content-cell { margin-top: 4px; }
+.xread-browser .page-option { margin: 4px 5px 2px; }
+.xread-browser .page-card {
+    display: block; width: 100%; box-sizing: border-box; -webkit-box-sizing: border-box;
+    border: 2px solid #DFE3E8; border-radius: 8px; -webkit-border-radius: 8px;
+    padding: 8px 4px 6px; text-align: center; cursor: pointer;
+}
+.xread-browser .page-image { display: block; margin: 0 auto 4px; }
+.xread-browser .page-radio { margin-top: 0; vertical-align: middle; }
+.xread-browser .page-label { display: block; font-size: 14px; color: #333; line-height: 18px; margin-top: 2px; }
+.xread-browser .page-option.active .page-card { border: 3px solid #000; background: #F5F6F8; padding: 7px 3px 5px; }
+.xread-browser .page-option.active .page-label { font-weight: bold; color: #000; }
+
+.xread-browser .config-content h2 { margin: 12px 0 8px; padding-bottom: 6px; }
+.xread-browser .config-content h2 .sec-no { font-size: 14px; }
+
+.xread-browser .bm-book-title { font-size: 14px; line-height: 18px; height: 36px; font-weight: bold; margin: 4px 0 2px; }
+.xread-browser .bm-book-author { font-size: 14px; line-height: 18px; margin-bottom: 6px; }
+
+@media (max-width: 700px) {
+    .xread-browser .about-modal .about-content { width: 90%; padding: 16px 14px 12px; }
+    .xread-browser .about-modal .about-heading { font-size: 20px; }
+    .xread-browser .about-modal .about-row { font-size: 14px; line-height: 26px; }
+    .xread-browser .about-modal .about-label { width: 84px; white-space: nowrap; font-size: 14px; }
+    .xread-browser .about-modal .about-value {
+        width: calc(100% - 84px); white-space: nowrap; word-break: normal;
+        overflow: hidden; text-overflow: ellipsis; font-size: 14px;
+    }
+    .xread-browser .about-modal .about-footnote { font-size: 14px; margin-top: 8px; }
+    .xread-browser .bm-card-value { font-size: 20px; }
+    .xread-browser .bm-card-note { font-size: 11px; line-height: 1.2; }
+    .xread-browser .bm-card-unit { font-size: 11px; }
+    .xread-browser .bm-status-bar { font-size: 12px; line-height: 1.3; }
+    .xread-browser .page-image { height: 76px; }
+    .xread-browser .page-label { font-size: 13px; }
+}
+@media (max-width: 400px) {
+    .xread-browser .page-image { height: 66px; }
+    .xread-browser .about-modal .about-value { font-size: 13px; }
+}
+
+/* =====================================================================
+   r57 / v1.0.48.57 手机/PC 端适配覆盖（仅 .xread-browser，Kindle 不命中）
+   ---------------------------------------------------------------------
+   1) 字体选择框字号 = 标签字号（手机 18px，与统一字号入口一致）
+   2) C 卡选择框在手机端再缩一档
+   3) 翻页恢复 .52 朴素样式（HTML 已移除卡片框/文字元素，此处兜底覆盖）
+   4) 全屏(PWA)顶部菜单压线修复：高度计入安全区，按钮区不再被底边框挤压
+   关于本机弹窗字体样式与入口颜色已统一到 kindle.css 全局块（r57/r58），
+   本文件不再重复定义，避免终端差异与冗余。
+   ===================================================================== */
+.xread-browser #fontFamily { font-size: 18px !important; }              /* 字体框=标签 18px */
+.xread-browser .bm-card-select { font-size: 12px !important; }          /* C 卡选择框再缩一档 */
+
+/* 3) 翻页恢复 .52：去掉卡片框与文字标签残留（元素已移除，兜底保险） */
+.xread-browser .page-card { border: 0 !important; background: transparent !important; padding: 0 !important; box-shadow: none !important; }
+.xread-browser .page-label { display: none !important; }
+.xread-browser .page-image { display: inline !important; margin: 0 !important; }
+.xread-browser .page-radio { margin-top: 5px !important; vertical-align: middle !important; }
+
+/* 4) 全屏顶部菜单压线修复：高度 = 86px + 安全区，避免 padding-top 挤占按钮区导致文字压底边框 */
+.xread-browser #topMenu {
+    height: calc(86px + env(safe-area-inset-top, 0px)) !important;
+    box-sizing: border-box !important;
+    -webkit-box-sizing: border-box !important;
+}
