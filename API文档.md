@@ -1,8 +1,8 @@
-# xread-kindle 对接的后端 API 接口文档
+# kabi-reader 后端 API 接口文档
 
 > 整理来源：`index.html`、`js/config.js`、`js/kindle.js`
 > 项目性质：纯静态前端阅读器（HTML/CSS/JS），通过 `window.READER_CONFIG` 配置服务器，调用后端 REST 接口渲染书架、目录、正文、书源。
-> 代码仓库：`https://github.com/bingkuomiao/xread-kindle`（私有库，经 GitHub MCP 连接器读取）
+> 代码仓库：`https://github.com/bingkuomiao/kabi-reader`（私有库，经 GitHub MCP 连接器读取）
 
 ---
 
@@ -295,13 +295,13 @@ refresh=0&url={bookUrl}&name={bookName}&searchSize={pageSize}&lastIndex={sourceI
 **请在拥有仓库访问权限的本机执行**（仓库已克隆的情况下）将字体复制到本项目 `fonts/` 目录：
 
 ```bash
-# 在你的本地 xread-kindle 仓库内，复制字体到本项目 fonts 目录
-cp fonts/*.woff /workspace/xread-kindle/fonts/
+# 在你的本地 kabi-reader 仓库内，复制字体到本项目 fonts 目录
+cp fonts/*.woff /workspace/kabi-reader/fonts/
 ```
 
 若本机也未克隆，执行：
 
 ```bash
-git clone https://github.com/bingkuomiao/xread-kindle.git /tmp/xread-kindle
-cp /tmp/xread-kindle/fonts/*.woff /workspace/xread-kindle/fonts/
+git clone https://github.com/bingkuomiao/kabi-reader.git /tmp/kabi-reader
+cp /tmp/kabi-reader/fonts/*.woff /workspace/kabi-reader/fonts/
 ```

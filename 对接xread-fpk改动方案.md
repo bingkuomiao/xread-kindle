@@ -1,7 +1,7 @@
-# xread-kindle 对接 xread-fpk 后端 · 改动方案
+# kabi-reader 对接 xread-fpk 后端 · 改动方案
 
 > 分析依据：
-> - 前端：`xread-kindle`（`index.html` / `js/config.js` / `js/kindle.js`）
+> - 前端：`kabi-reader`（`index.html` / `js/config.js` / `js/kindle.js`）
 > - 后端：`bingkuomiao/xread-fpk`（`main` 分支，commit `9af4149…`），即 `Charmillionaire/xread`（Rust/axum 后端 + Vue3 前端，"阅读3 / reader3" 体系）的自托管 fork，**后端零改动**
 > - 后端路由源码：`upstream/src/api/router.rs`、`handlers/{book,book_source,user}.rs`
 
@@ -9,8 +9,8 @@
 
 ## 0. 结论速览
 
-- xread-fpk 是标准 **reader3** 后端，所有 JSON 接口统一挂在 **`/reader3/`** 前缀下，与 xread-kindle 前端 `url()` 拼接规则（`/reader3/{router}`）**完全一致**。
-- xread-kindle 依赖的 **9 个接口中有 6 个可直接复用**，3 个需要调整：
+- xread-fpk 是标准 **reader3** 后端，所有 JSON 接口统一挂在 **`/reader3/`** 前缀下，与 kabi-reader 前端 `url()` 拼接规则（`/reader3/{router}`）**完全一致**。
+- kabi-reader 依赖的 **9 个接口中有 6 个可直接复用**，3 个需要调整：
   1. **`getBookContent`**：前端请求字段语义不符（传 `url=bookUrl`，后端期望 `chapterUrl`+`bookSourceUrl`）。
   2. **`searchBookSource`**：后端**无此路由**（只有 SSE 版 `searchBookSourceSSE` 和 `getAvailableBookSource`），且返回结构是 `books/lastIndex/hasMore`。
   3. **`deleteBook`**：后端按 `Book.bookUrl` 删除，前端只传了 `url`，需补 `bookUrl`。
@@ -22,14 +22,14 @@
 
 ```
 ┌──────────────────┐         HTTP /reader3/*          ┌──────────────────────┐
-│  xread-kindle     │  ───────────────────────────▶   │  xread-fpk 后端       │
+│  kabi-reader     │  ───────────────────────────▶   │  xread-fpk 后端       │
 │  (静态站点,       │   accessToken 作为 query 传参     │  Rust/axum, 端口 7777 │
 │   Kindle 浏览器)  │  ◀───────────────────────────   │  (fnOS .fpk 部署)     │
 └──────────────────┘                                  └──────────────────────┘
 ```
 
 - xread-fpk **独立部署**（默认端口 `7777`，fnOS 打包为 `.fpk`）。
-- xread-kindle 仍是**独立静态站点**，不需要塞进 xread 的 web 目录；只要把 `READER_CONFIG.address` 指向 xread 后端基址即可。
+- kabi-reader 仍是**独立静态站点**，不需要塞进 xread 的 web 目录；只要把 `READER_CONFIG.address` 指向 xread 后端基址即可。
 - 二者通过 `accessToken`（query 参数）鉴权，浏览器同源/跨域由 xread 的 `CorsLayer::very_permissive()` 放行。
 
 ---
@@ -189,7 +189,7 @@ window.READER_CONFIG = {
 ## 7. 验证清单
 
 1. 启动 xread-fpk，确认 `GET /reader3/health` 与 `POST /reader3/login` 可达（默认 `:7777`）。
-2. 改 `config.js` 指向后端、填账号，浏览器打开 xread-kindle 完成登录。
+2. 改 `config.js` 指向后端、填账号，浏览器打开 kabi-reader 完成登录。
 3. 端到端验证：
    - [ ] 书架正常加载（getBookshelf 字段一致）
    - [ ] 点书 → 目录加载（getChapterList）
