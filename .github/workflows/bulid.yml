@@ -1,4 +1,4 @@
-name: Build kabi reader
+name: Build xread reader
 
 on:
   push:
