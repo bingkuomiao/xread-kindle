@@ -2,7 +2,7 @@ name: Build xread reader
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main1" ]
   workflow_dispatch:
 
 jobs:

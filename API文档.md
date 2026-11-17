@@ -13,18 +13,18 @@
 ```javascript
 window.READER_CONFIG = {
     type: "multi",                       // 服务器类型：app | single | multi
-    address: "http://192.200.217.59:4396", // 后端地址（必改）
+    address: "",                          // 留空=自动同源（与 js/config.js 当前实际配置一致）
     username: "",
     password: "",
     salt: "",
-    contentFontSize: 47, lineHeight: 1.3, fontFamily: "系统默认",
+    contentFontSize: 47, lineHeight: 1.3, fontFamily: "系统",
     fontWeight: "normal", letterSpacing: 7,
     menuFontSizeRatio: 0.6, currentClickFunNum: 4,
     debugMode: false, debugLevel: 0
 };
 ```
 
-### 1.2 请求地址构造（`url(router, data)` 函数，kindle.js:78）
+### 1.2 请求地址构造（`url(router, data)` 函数，js/kindle.js）
 
 所有接口路径都由 `url()` 统一拼接，**后端所有接口都挂在 `/reader3/` 前缀下**（仅 `app` 模式去掉此前缀，直接 `/{router}`）：
 
@@ -40,12 +40,12 @@ window.READER_CONFIG = {
 
 ### 1.3 鉴权模型（重点）
 
-1. 打开页面进入登录界面，`checkLoginState()` 检查内存变量 `accessToken` 是否存在（kindle.js:2389）。
-2. `multi` 模式下，用户提交用户名密码 → `loginBookshelf()` 调 `login` 接口（kindle.js:2495）。
-3. 登录成功后后端返回 `res.data.accessToken`，前端存入全局 `accessToken`（kindle.js:2521），随后每个 `multi` 请求都通过 `url()` 自动带上 `accessToken` 参数 + Cookie。
-4. 登出 `sendLogoutRequest()` 清空 `accessToken`，并调用 `logout` 接口（kindle.js:2590）。
+1. 打开页面进入登录界面，`checkLoginState()` 检查内存变量 `accessToken` 是否存在（js/kindle.js）。
+2. `multi` 模式下，用户提交用户名密码 → `loginBookshelf()` 调 `login` 接口（js/kindle.js）。
+3. 登录成功后后端返回 `res.data.accessToken`，前端存入全局 `accessToken`（js/kindle.js），随后每个 `multi` 请求都通过 `url()` 自动带上 `accessToken` 参数 + Cookie。
+4. 登出 `sendLogoutRequest()` 清空 `accessToken`，并调用 `logout` 接口（js/kindle.js）。
 
-> ⚠️ 密码目前**未加密**：`decode()` / `encode()` 均为原样返回（kindle.js:269-275），传输为明文 JSON。
+> ⚠️ 密码目前**未加密**：`decode()` / `encode()` 均为原样返回（js/kindle.js），传输为明文 JSON。
 
 ---
 
@@ -79,7 +79,7 @@ window.READER_CONFIG = {
 }
 ```
 
-- **前端处理**：`res.data.accessToken` → 全局 `accessToken`（kindle.js:2519-2522）。
+- **前端处理**：`res.data.accessToken` → 全局 `accessToken`（js/kindle.js）。
 - **调用位置**：`loginBookshelf()`（仅 `multi` 模式使用账号密码）。
 
 ### 2.2 登出 `logout`
@@ -88,7 +88,7 @@ window.READER_CONFIG = {
 - **路径**：`{addr}/reader3/logout`
 - **请求体**：`null`（前端 `JSON.stringify(null)`）
 - **鉴权**：`accessToken`（multi/single）
-- **调用位置**：`sendLogoutRequest()`（kindle.js:2592），登出前会先同步保存阅读进度。
+- **调用位置**：`sendLogoutRequest()`（js/kindle.js），登出前会先同步保存阅读进度。
 
 ### 2.3 获取书架 `getBookshelf`
 
@@ -113,7 +113,7 @@ window.READER_CONFIG = {
 | `latestChapterTitle` | 最新章节标题 |
 | `latestChapterTime` | 最新章节更新时间戳 |
 
-- **调用位置**：`getBookshelf()`（kindle.js:493）。
+- **调用位置**：`getBookshelf()`（js/kindle.js）。
 
 ### 2.4 获取章节列表 `getChapterList`
 
@@ -127,7 +127,7 @@ window.READER_CONFIG = {
 
 - **响应 `res.data`**：章节对象数组，每项 `{ index: 序号, title: 章节标题 }`。前端缓存到 `bookChapterMapCache`，并做标题清洗（去非法字符、中文数字转阿拉伯）。
 - **前端分页**：本地按 `showChapterListNum=16` 分页展示，不直接依赖后端分页参数。
-- **调用位置**：`getChapterList()`（kindle.js:759/777/781）。
+- **调用位置**：`getChapterList()`（js/kindle.js）。
 
 ### 2.5 获取章节内容 `getBookContent`
 
@@ -139,10 +139,10 @@ window.READER_CONFIG = {
 { "index": 章节序号, "refresh": 1, "url": "{bookUrl}" }
 ```
 
-> 预加载场景 `refresh=0`（kindle.js:1109）。
+> 预加载场景 `refresh=0`（js/kindle.js）。
 
 - **响应 `res.data`**：字符串，即该章节的**纯文本正文**（前端会拼接章节标题 + 段首缩进两个全角空格后分页渲染）。
-- **调用位置**：`getBookContent()`（kindle.js:936/953/957）、`preloadChaptersBatch()`（预加载，kindle.js:1118/1123）。
+- **调用位置**：`getBookContent()`（js/kindle.js）、`preloadChaptersBatch()`（预加载，js/kindle.js）。
 
 ### 2.6 保存阅读进度 `saveBookProgress`
 
@@ -160,7 +160,7 @@ window.READER_CONFIG = {
 }
 ```
 
-- **请求体（`app` 模式，覆盖写法，kindle.js:1360）**：
+- **请求体（`app` 模式，覆盖写法，js/kindle.js）**：
 
 ```json
 {
@@ -172,9 +172,9 @@ window.READER_CONFIG = {
 }
 ```
 
-- **同步保存**：页面卸载等关键场景用 `saveReadProcessSync()` 发**同步** POST（kindle.js:1395）。
+- **同步保存**：页面卸载等关键场景用 `saveReadProcessSync()` 发**同步** POST（js/kindle.js）。
 - **响应**：`{ isSuccess, errorMsg }`。成功后前端更新 `currentChapterIndex`。
-- **调用位置**：切章 / 翻页时自动调用（kindle.js:1323、1532）。
+- **调用位置**：切章 / 翻页时自动调用（js/kindle.js）。
 
 ### 2.7 搜索书源 `searchBookSource`
 
@@ -198,7 +198,7 @@ refresh=0&url={bookUrl}&name={bookName}&searchSize={pageSize}&lastIndex={sourceI
 ```
 
 - **前端分页**：本地按 `sourcePageSize=10` 缓存拼接（`bookSourceMapCache`）。
-- **调用位置**：`getSourceList()`（kindle.js:1725/1746/1750）。
+- **调用位置**：`getSourceList()`（js/kindle.js）。
 
 ### 2.8 设置书源 `setBookSource`
 
@@ -216,8 +216,8 @@ refresh=0&url={bookUrl}&name={bookName}&searchSize={pageSize}&lastIndex={sourceI
 ```
 
 - **响应 `res.data`**：`{ origin: "切换后实际生效的书源URL" }`，`res.isSuccess` 标记成功。
-- **前端处理**：成功后更新 `currentBookUrl`/`currentSourceUrl` 并重新加载内容（kindle.js:1819）。
-- **调用位置**：`setReadSource()`（kindle.js:1834/1843/1851）。
+- **前端处理**：成功后更新 `currentBookUrl`/`currentSourceUrl` 并重新加载内容（js/kindle.js）。
+- **调用位置**：`setReadSource()`（js/kindle.js）。
 
 ### 2.9 删除书籍 `deleteBook`
 
@@ -230,7 +230,7 @@ refresh=0&url={bookUrl}&name={bookName}&searchSize={pageSize}&lastIndex={sourceI
 ```
 
 - **响应**：`{ isSuccess, errorMsg }`。成功后前端重新拉取书架（`getBookshelf()`）。
-- **调用位置**：`deleteBookItem()`（kindle.js:1861）。
+- **调用位置**：`deleteBookItem()`（js/kindle.js）。
 
 ---
 
@@ -238,7 +238,7 @@ refresh=0&url={bookUrl}&name={bookName}&searchSize={pageSize}&lastIndex={sourceI
 
 书架封面不是独立 API，而是由后端**静态文件服务**提供：
 
-- 当书籍 `coverUrl` 不以 `http` 开头时，前端拼接为 `{addr}{coverUrl}`（kindle.js:453）。
+- 当书籍 `coverUrl` 不以 `http` 开头时，前端拼接为 `{addr}{coverUrl}`（js/kindle.js）。
 - 因此后端需能直接以 GET 返回该封面图片（路径由 `getBookshelf` 返回数据给出）。
 - 加载失败的兜底图为 `img/noCover.jpg`（前端本地资源）。
 
@@ -274,7 +274,7 @@ refresh=0&url={bookUrl}&name={bookName}&searchSize={pageSize}&lastIndex={sourceI
 
 ## 6. 附录：前端依赖的字体文件（本地静态资源）
 
-字体由 `css/kindle.css` 通过 `@font-face` 直接引用，**不经过后端接口**，需以文件形式放在 `fonts/` 目录下。仓库默认 commit `92ba470bfd667429eeff3dbc9da3793f35964f2b` 下共有 5 个：
+字体由 `css/kindle.css` 通过 `@font-face` 直接引用，**不经过后端接口**，需以文件形式放在 `fonts/` 目录下。当前仓库 `fonts/` 目录共有 3 个（均随仓库提供）：
 
 | 文件名 | CSS 字体名 | 用途 |
 |--------|-----------|------|
@@ -282,26 +282,6 @@ refresh=0&url={bookUrl}&name={bookName}&searchSize={pageSize}&lastIndex={sourceI
 | `fonts/NuoMiYuanTi.woff` | 糯米圆体 | 圆体风格 |
 | `fonts/yunduo.woff` | 云朵字体 | 云朵风格 |
 
-> 前端 `fontFamilyMap`（kindle.js:2130）将配置项映射到上述字体名；默认配置 `fontFamily: "系统默认"`，即不加载自定义字体。
+> 前端 `fontFamilyMap`（js/kindle.js）将配置项映射到上述字体名；默认配置 `fontFamily: "系统"`，即不加载自定义字体。
 
-### 字体获取说明（重要）
-
-沙箱内**无法直接下载这些字体文件**，原因：
-
-1. `git clone` / `raw.githubusercontent.com` 被沙箱防火墙拦截（HTTP 000，无代理出口）；
-2. GitHub 内容接口对每个文件有 1 MB 限制，上述字体均超过该上限，MCP 仅返回 `download_url` 而非内容；
-3. 经 MCP 文本通道取得的二进制会被转义、不可靠还原为真实 `.woff`。
-
-**请在拥有仓库访问权限的本机执行**（仓库已克隆的情况下）将字体复制到本项目 `fonts/` 目录：
-
-```bash
-# 在你的本地 xread-kindle 仓库内，复制字体到本项目 fonts 目录
-cp fonts/*.woff /workspace/xread-kindle/fonts/
-```
-
-若本机也未克隆，执行：
-
-```bash
-git clone https://github.com/bingkuomiao/xread-kindle.git /tmp/xread-kindle
-cp /tmp/xread-kindle/fonts/*.woff /workspace/xread-kindle/fonts/
-```
+> 上述 3 个字体文件已随仓库提供于 `fonts/` 目录，构建 FPK 时一并打包，无需额外下载或复制。

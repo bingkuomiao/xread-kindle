@@ -36,21 +36,21 @@
 
 ## 2. 接口兼容性矩阵
 
-| kabi 接口常量 | xread 路由 | 方法 | 结论 | 关键差异 |
+| xread-kindle 接口常量 | xread 路由 | 方法 | 结论 | 关键差异 |
 |---|---|---|---|---|
 | `login` | `POST /reader3/login` | POST | ✅ 直接复用 | 请求 `{username,password,isLogin,code}` 一致；返回 `data.accessToken`（阅读3 标准） |
-| `logout` | `POST /reader3/logout` | POST | ✅ 直接复用 | 后端返回 `err("请重新登录")` 错误体，kabi 忽略响应，无影响 |
+| `logout` | `POST /reader3/logout` | POST | ✅ 直接复用 | 后端返回 `err("请重新登录")` 错误体，xread-kindle 忽略响应，无影响 |
 | `getBookshelf` | `GET /reader3/getBookshelf` | GET | ✅ 直接复用 | 返回 legado 标准书本数组，字段与前端读取一致 |
-| `getChapterList` | `GET/POST /reader3/getChapterList` | POST | ✅ 直接复用 | `url` 被反序列化为 `book_url`（别名），kabi 传 `url:bookUrl` 正确 |
+| `getChapterList` | `GET/POST /reader3/getChapterList` | POST | ✅ 直接复用 | `url` 被反序列化为 `book_url`（别名），xread-kindle 传 `url:bookUrl` 正确 |
 | `getBookContent` | `GET/POST /reader3/getBookContent` | POST | ⚠️ **需改动** | 见 §3.1 |
-| `saveBookProgress` | `POST /reader3/saveBookProgress` | POST | ✅ 直接复用 | 收 `{url\|bookUrl, index}`，kabi 传 `url:bookUrl`/`index` 兼容 |
+| `saveBookProgress` | `POST /reader3/saveBookProgress` | POST | ✅ 直接复用 | 收 `{url\|bookUrl, index}`，xread-kindle 传 `url:bookUrl`/`index` 兼容 |
 | `searchBookSource` | （无）/ `getAvailableBookSource` / `searchBookSourceSSE` | GET/POST | ⚠️ **需改动** | 见 §3.2 |
-| `setBookSource` | `POST /reader3/setBookSource` | POST | ✅ 直接复用 | 解析 `bookUrl\|url`→book_url、`newUrl`、`bookSourceUrl`，kabi 三参齐全 |
-| `deleteBook` | `POST /reader3/deleteBook` | POST | ⚠️ **需补字段** | 收 `Json<Book>`，按 `bookUrl` 删除；kabi 只传 `url` 会导致 `book_url` 为空。需补 `bookUrl` |
+| `setBookSource` | `POST /reader3/setBookSource` | POST | ✅ 直接复用 | 解析 `bookUrl\|url`→book_url、`newUrl`、`bookSourceUrl`，xread-kindle 三参齐全 |
+| `deleteBook` | `POST /reader3/deleteBook` | POST | ⚠️ **需补字段** | 收 `Json<Book>`，按 `bookUrl` 删除；xread-kindle 只传 `url` 会导致 `book_url` 为空。需补 `bookUrl` |
 
 ### 书本/章节对象字段核对（✅ 一致）
 - **书架**：`name, author, bookUrl, origin, coverUrl, customCoverUrl, totalChapterNum, durChapterIndex, durChapterPos, durChapterTime, durChapterTitle, latestChapterTitle, latestChapterTime` —— 与 `createBookItemElement()` 读取字段完全对应。
-- **目录**：`{ index, title, url }`，`url` 为**章节内容 URL**，kabi 用 `index/title`，`url` 供正文获取（§3.1 关键）。
+- **目录**：`{ index, title, url }`，`url` 为**章节内容 URL**，xread-kindle 用 `index/title`，`url` 供正文获取（§3.1 关键）。
 - **正文**：返回章节正文**字符串**。
 - **封面**：`coverUrl` 相对路径时由 `config.address + coverUrl` 拼接（xread 封面走 `/reader3/cover?path=...`，拼接后可直接访问）。
 
@@ -61,7 +61,7 @@
 ### 3.1 `getBookContent` —— 修正请求字段语义
 
 **问题**
-- kabi 当前发送：`{ index, refresh:1, url: bookUrl }`，期望返回第 `index` 章正文。
+- xread-kindle 当前发送：`{ index, refresh:1, url: bookUrl }`，期望返回第 `index` 章正文。
 - xread `BookContentRequest` 定义：`chapterUrl`（别名 `url`/`href`）、`bookSourceUrl`（别名 `origin`）、`bookSource`、`index`、`refresh`。**`url` 会被反序列化为 `chapter_url`（章节URL），而非 bookUrl**；且结构体**没有 `bookUrl` 字段**。
 - 后端 `resolve_book_source` 需要 `bookSourceUrl`/`bookSource` 或 `book_url`/`toc_url` 才能定位书源；若只传 `url=bookUrl`（被当成 chapterUrl），无法解析到正确书源 → 拿不到正文。
 
@@ -97,20 +97,20 @@ function buildBookContentParams(chapterIndex, bookUrl) {
 ### 3.2 `searchBookSource` —— 改用 `getAvailableBookSource`
 
 **问题**
-- kabi 调 `GET /reader3/searchBookSource?refresh&url&name&searchSize&lastIndex`。
+- xread-kindle 调 `GET /reader3/searchBookSource?refresh&url&name&searchSize&lastIndex`。
 - xread **无此路由**。`router.rs` 中只有：
-  - `searchBookSourceSSE`（SSE 流式，`EventSource` 才能消费，kabi 的 `HttpGet`/`XMLHttpRequest` 模型不兼容）；
+  - `searchBookSourceSSE`（SSE 流式，`EventSource` 才能消费，xread-kindle 的 `HttpGet`/`XMLHttpRequest` 模型不兼容）；
   - `getAvailableBookSource`（GET/POST，语义完全对应"为某本书在所有书源里搜可替代源"）。
 
 **修复**：把路由常量指向 `getAvailableBookSource`，参数名 `searchSize → resultLimit`，并适配返回结构。
 
-**改动 1 —— 接口常量（L18-27）**
+**改动 1 —— 接口常量（js/kindle.js 顶部）**
 ```javascript
 // 原： searchBookSource = "searchBookSource",
 searchBookSource = "getAvailableBookSource",   // 改用 xread 的等价路由
 ```
 
-**改动 2 —— `getSourceList()`（约 L1791）参数与分页**
+**改动 2 —— `getSourceList()`（js/kindle.js）参数与分页**
 ```javascript
     var params = {
         refresh: refresh ? 1 : 0,
@@ -122,7 +122,7 @@ searchBookSource = "getAvailableBookSource",   // 改用 xread 的等价路由
         concurrentCount: 6            // 并发探测书源数量
     };
 ```
-- `getAvailableBookSource` 在 `router.rs` 中注册了 GET/POST，kabi 现有 `HttpGet(...)` 无需改方法。
+- `getAvailableBookSource` 在 `router.rs` 中注册了 GET/POST，xread-kindle 现有 `HttpGet(...)` 无需改方法。
 - **返回结构必须以代码为准**：分页请求（带 `resultLimit` 且 `lastIndex` 为 -1 或 ≥0）返回 `{ books, lastIndex, hasMore }`（`AvailableBookSourceResponse`，camelCase）；不带 `resultLimit` 且 `lastIndex<0` 时返回**裸数组**。因此 `handleSourceListResponse()` 必须读 `res.data.books`，不能再用 `res.data.list`。
 - 书源是"按书源逐个探测"的，一次只返回 `resultLimit` 条命中；`hasMore` 为真时用返回的 `lastIndex` 继续拉下一批。改动后 `jumpSourcePage()` 翻到缓存末尾会自动续拉一页。
 - 列表项字段为 `SearchBook`：`name, author, bookUrl, origin, coverUrl, ...`（**没有 `originName`**），`createSourceButton()` 已改为优先显示 `originName`，缺失时退化为 `origin` 的域名。
@@ -131,7 +131,7 @@ searchBookSource = "getAvailableBookSource",   // 改用 xread 的等价路由
 
 **问题**
 - xread `delete_book` 的入参是 `Json<Book>`（`#[serde(default, rename_all = "camelCase")]`），实际删除以 `book_url` 为准。
-- kabi 只发送 `{refresh, url, name, author}`：`url` 不是 `Book` 字段（会被忽略），`book_url` 为空 → `delete_book` 返回 `书架书籍不存在`。
+- xread-kindle 只发送 `{refresh, url, name, author}`：`url` 不是 `Book` 字段（会被忽略），`book_url` 为空 → `delete_book` 返回 `书架书籍不存在`。
 
 **修复 —— `deleteBookItem()`**
 ```javascript
@@ -156,7 +156,7 @@ window.READER_CONFIG = {
     username: "<xread 账号>",
     password: "<xread 密码>",
     salt: "",
-    contentFontSize: 47, lineHeight: 1.3, fontFamily: "系统默认",
+    contentFontSize: 47, lineHeight: 1.3, fontFamily: "系统",
     fontWeight: "normal", letterSpacing: 7,
     menuFontSizeRatio: 0.6, currentClickFunNum: 4,
     debugMode: false, debugLevel: 0
@@ -168,9 +168,9 @@ window.READER_CONFIG = {
 
 ## 5. 鉴权说明
 
-- xread `AuthContext` 从 **query `accessToken`**（或 `Authorization: Bearer`）读取令牌（`auth.rs`）。kabi `url()` 已自动在 multi 模式附带 `accessToken`，**天然兼容**。
-- kabi 在 multi 模式设置 `xhr.withCredentials = true`，但 xread 用令牌而非 Cookie 鉴权，该设置**无害**。
-- xread 是**多用户模型**：每个 kabi 设备用各自 xread 账号登录，书架/进度按用户隔离（`user_ns`）。`getBookshelf`/`getChapterList` 等均以 `accessToken` 解析出 `user_ns` 再查数据。
+- xread `AuthContext` 从 **query `accessToken`**（或 `Authorization: Bearer`）读取令牌（`auth.rs`）。xread-kindle `url()` 已自动在 multi 模式附带 `accessToken`，**天然兼容**。
+- xread-kindle 在 multi 模式设置 `xhr.withCredentials = true`，但 xread 用令牌而非 Cookie 鉴权，该设置**无害**。
+- xread 是**多用户模型**：每个 xread-kindle 设备用各自 xread 账号登录，书架/进度按用户隔离（`user_ns`）。`getBookshelf`/`getChapterList` 等均以 `accessToken` 解析出 `user_ns` 再查数据。
 - 若 xread 未配置安全密钥（默认 `secureEnabled=false`），`secureKeyRequired=false`，登录仍可正常下发 `accessToken`；建议仍为每台设备建独立账号以便进度隔离。
 
 ---
@@ -214,7 +214,7 @@ window.READER_CONFIG = {
 | `js/kindle.js` | `jumpSourcePage()` | 缓存翻到末尾时可继续向服务端拉取下一页书源 |
 | `js/kindle.js` | `createSourceButton()` | 无 `originName` 时用 `origin` 域名作显示名 |
 | `js/kindle.js` | `deleteBookItem()` | 补 `bookUrl` / `origin` |
-| `js/config.js` | `address` | 指向 `http://192.200.217.59:7777`（xread 默认端口，按实际部署改） |
+| `js/config.js` | `address` | 曾指向 `http://192.200.217.59:7777`；当前已改为留空=自动同源（见 js/config.js） |
 
 已通过 `node --check` 语法校验，未改动任何后端代码。
 
