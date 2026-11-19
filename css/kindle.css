@@ -34,8 +34,11 @@ html, body {
     margin: 0px;
     padding: 0;
     height: 100vh;
-    -webkit-text-size-adjust: 100vh;
-    text-size-adjust: 100vh;
+    /* Kindle 内置浏览器(WebKit 534)聚焦输入框时，若 text-size-adjust 为 auto 或非法值，
+       会按「文本偏小」自动放大整页且不恢复。100vh 是非法值(只接受 none/auto/百分比)，
+       被丢弃后会回退到 auto——改为 none 显式禁用自动文本缩放，这是聚焦放大的根因之一。 */
+    -webkit-text-size-adjust: none;
+    text-size-adjust: none;
 }
         
 select{
@@ -165,6 +168,22 @@ label {
     margin: 0 0 12px 0;
 }
 
+/* 登录异常原因提醒：浅底 + 左侧一条强调线，克制不刺眼；灰度屏下同样协调；默认隐藏 */
+.login-content .login-error {
+    display: none;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0 0 14px 0;
+    padding: 10px 14px 10px 16px;
+    font-size: 19px;
+    line-height: 1.45;
+    color: #303845;
+    background-color: #F4F6FA;
+    border-left: 4px solid #4A76D8;
+    border-radius: 6px;
+    -webkit-border-radius: 6px;
+}
+
 /* 字段行：标签独占一行在上、输入框在下。
    不复用全局 .form-label / .input-wrapper 的 float 左右布局，改用块级堆叠。
    全部用 display:block + float:none + width:100% 显式覆盖，避免老 WebKit 继承浮动。 */
@@ -198,10 +217,12 @@ label {
 
 .login-content .form-control {
     width: 100%;
-    height: 50px;
-    /* 输入框字号与字段标签(24px)、登录按钮(28px)取同一梯度，避免过大显得突兀；
-       不再沿用旧版强行放大的 36px，聚焦放大改由 viewport 侧统一规避。 */
-    font-size: 26px;
+    height: 58px;
+    /* 聚焦放大修复：Kindle 浏览器 viewport 按 1072 物理像素布局、dpr≈1.8，
+       26px CSS 实际仅约 14.5 物理像素，低于 WebKit 聚焦自动放大的 16px 阈值，
+       点输入框就被放大且不恢复；恢复到历史真机验证过的 36px（实际约 64 物理像素）
+       即可从源头避免放大。kindle.css 的 meta viewport 在老内核上无效，不能依赖 JS 补救。 */
+    font-size: 36px;
     color: #1B1F26;
     background-color: #FFFFFF;
     /* 去掉原生控件外观：老 Kindle 对带原生外观的 input 会在聚焦时按「小控件」放大整页 */
@@ -274,6 +295,7 @@ label {
     position: absolute;
     margin: 10px;
 }
+
 
 /*************书架内容样式区*********************/
 #bookshelf {
@@ -1838,3 +1860,239 @@ html:not(.xread-browser) .about-modal .about-value {
     white-space: nowrap !important; word-break: normal !important; overflow: hidden !important; text-overflow: ellipsis !important;
 }
 html:not(.xread-browser) .about-modal .about-footnote { font-size: 22px !important; margin-top: 12px !important; }
+
+/* =====================================================================
+   r70 / v1.0.48.70 Kindle 真机修复：字体框收窄 + 正文空行（JS 侧）
+   ---------------------------------------------------------------------
+   1) 字体配置：字号/字距/行距数字框原本随 .input-wrapper 撑满整行，
+      数字只有 1-2 位时右侧大片留白显得很长。收窄到固定宽度，
+      与「字体」下拉框视觉协调；仅 Kindle(html:not(.xread-browser)) 生效，
+      手机端由 other.css 媒体查询维持原状。
+   ===================================================================== */
+/* r92 修正：数字框只需容纳“47/1.3”+步进箭头，收窄到 110px，
+   右侧不再大片留白；下拉框要显示“系统/云朵”等文字，保持 150px。 */
+html:not(.xread-browser) .config-content .number-input {
+    width: 110px !important;
+    max-width: 110px !important;
+}
+html:not(.xread-browser) .font-selector { width: 150px !important; }
+html:not(.xread-browser) #fontFamily { width: 150px !important; max-width: 150px !important; }
+
+/* =====================================================================
+   r93 / v1.0.48.93 字体配置区按附件重排（Kindle 真机：html:not(.xread-browser)）
+   ---------------------------------------------------------------------
+   附件样式：标题「01 配置字体」黑底序号；每行 标签 | 数值/下拉 | 操作按钮；
+   字号/字距/行距显示数值+单位，右侧黑底白字 −/+ 方块按钮；加粗为按钮。
+   1) 三列用 display:table/table-cell（老 WebKit 534 稳定支持，不用 flex gap/grid）
+   2) 数字框去边框去步进箭头，数值左对齐、单位小灰字紧贴
+   3) 加粗保留隐藏 checkbox（JS 仍读 .checked），label 作按钮，选中反色
+   ===================================================================== */
+html:not(.xread-browser) .config-content .font-cfg { width: 100% !important; }
+
+html:not(.xread-browser) .config-content .fc-row {
+    display: table !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 6px 0 !important;
+    border-bottom: 1px solid #E6E6E6;
+    line-height: 52px !important;
+}
+html:not(.xread-browser) .config-content .fc-row:first-child { border-top: 1px solid #E6E6E6; }
+html:not(.xread-browser) .config-content .fc-row > .form-label,
+html:not(.xread-browser) .config-content .fc-row > .fc-value,
+html:not(.xread-browser) .config-content .fc-row > .fc-action {
+    display: table-cell !important;
+    vertical-align: middle !important;
+    float: none !important;
+}
+html:not(.xread-browser) .config-content .fc-row > .form-label {
+    width: 22% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 52px !important;
+    text-align: left !important;
+    font-size: 28px !important;
+    font-weight: bold !important;
+    color: #111 !important;
+    white-space: nowrap !important;
+}
+html:not(.xread-browser) .config-content .fc-row > .fc-value { width: 50% !important; }
+html:not(.xread-browser) .config-content .fc-row > .fc-action { width: 28% !important; text-align: right !important; }
+
+/* 标题序号：黑底白字小方块 */
+html:not(.xread-browser) .config-content h2 .sec-no {
+    display: inline-block !important;
+    background: #000 !important;
+    color: #FFF !important;
+    font-size: 18px !important;
+    font-weight: bold !important;
+    line-height: 24px !important;
+    padding: 1px 7px !important;
+    margin-right: 12px !important;
+    vertical-align: middle !important;
+}
+
+/* 字体下拉框：占满中间列，纯黑细框 */
+html:not(.xread-browser) .config-content .fc-select {
+    display: inline-block !important;
+    width: 100% !important;
+    max-width: 460px !important;
+    height: 52px !important;
+    line-height: 50px !important;
+    padding: 0 12px !important;
+    margin: 0 !important;
+    border: 2px solid #000 !important;
+    border-radius: 0 !important;
+    background: #FFF !important;
+    font-family: inherit !important;
+    font-size: 26px !important;
+    color: #000 !important;
+    vertical-align: middle !important;
+    box-sizing: border-box !important;
+    -webkit-box-sizing: border-box !important;
+}
+
+/* 数字框：无边框、大号加粗数字，单位小灰字紧贴 */
+html:not(.xread-browser) .config-content .fc-num input.number-input {
+    display: inline-block !important;
+    width: 84px !important;
+    max-width: 84px !important;
+    height: 52px !important;
+    line-height: 52px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    font-family: inherit !important;
+    font-size: 34px !important;
+    font-weight: bold !important;
+    color: #111 !important;
+    text-align: left !important;
+    vertical-align: middle !important;
+    -webkit-appearance: none;
+    appearance: none;
+}
+html:not(.xread-browser) .config-content .fc-num input.number-input::-webkit-inner-spin-button,
+html:not(.xread-browser) .config-content .fc-num input.number-input::-webkit-outer-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
+}
+html:not(.xread-browser) .config-content .fc-unit {
+    display: inline-block !important;
+    font-size: 18px !important;
+    line-height: 52px !important;
+    color: #9A9A9A !important;
+    vertical-align: middle !important;
+    margin-left: 2px !important;
+}
+
+/* 加粗按钮：隐藏原生 checkbox，label 作白底黑框按钮，选中反色 */
+html:not(.xread-browser) .config-content .fc-hidden-cb { display: none !important; }
+html:not(.xread-browser) .config-content .fc-bold-btn {
+    display: inline-block !important;
+    width: 120px !important; /* 与下方 −/+ 两按钮总宽对齐：56*2 + 间距8 */
+    height: 52px !important;
+    line-height: 48px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 2px solid #000 !important;
+    border-radius: 0 !important;
+    background: #FFF !important;
+    color: #000 !important;
+    font-family: inherit !important;
+    font-size: 26px !important;
+    font-weight: bold !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    box-sizing: border-box !important;
+    -webkit-box-sizing: border-box !important;
+    cursor: pointer;
+}
+html:not(.xread-browser) .config-content .fc-hidden-cb:checked + .fc-bold-btn {
+    background: #000 !important;
+    color: #FFF !important;
+}
+
+/* −/+ 步进按钮：黑底白字方块 */
+html:not(.xread-browser) .config-content .fc-step-btn {
+    display: inline-block !important;
+    width: 56px !important;
+    height: 52px !important;
+    line-height: 48px !important;
+    padding: 0 !important;
+    margin: 0 0 0 8px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #000 !important;
+    color: #FFF !important;
+    font-family: inherit !important;
+    font-size: 32px !important;
+    font-weight: normal !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    box-sizing: border-box !important;
+    -webkit-box-sizing: border-box !important;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+}
+html:not(.xread-browser) .config-content .fc-step-btn:active { background: #333 !important; }
+
+/* r93 补丁：#fontFamily 旧规则用 ID 选择器带 !important，需用同等/更高特异性覆盖 */
+html:not(.xread-browser) .config-content .font-cfg #fontFamily {
+    display: inline-block !important;
+    width: 100% !important;
+    max-width: 460px !important;
+    height: 52px !important;
+    line-height: 50px !important;
+    padding: 0 12px !important;
+    margin: 0 !important;
+    border: 2px solid #000 !important;
+    border-radius: 0 !important;
+    background-color: #FFF !important;
+    font-family: inherit !important;
+    font-size: 26px !important;
+    color: #000 !important;
+    vertical-align: middle !important;
+    box-sizing: border-box !important;
+    -webkit-box-sizing: border-box !important;
+}
+
+/* =====================================================================
+   r94 / v1.0.48.94 配置页微调（单位加深 + 弹窗上移 + 02/03 间距收紧）
+   ---------------------------------------------------------------------
+   1) 字号/字距/行距数字后的单位(px/px/倍)颜色由 #9A9A9A 加深到 #5A5A5A，
+      电纸书屏更易辨认，同时与纯黑数字保持层次。
+   2) 配置弹窗整体上移：仅 .font-config 的 padding-top 30px→18px（上移约12px），
+      不影响其它弹窗；让下边缘远离屏幕底部。
+   3) 「02 配置翻页」与「03 配置书籍」之间留白收紧：第三个 h2 的 margin-top
+      16px→6px（缩短约10px），弹窗变矮、下边缘随之上移。
+   ===================================================================== */
+html:not(.xread-browser) .config-content .fc-unit {
+    color: #5A5A5A !important;
+}
+html:not(.xread-browser) .modal.font-config {
+    padding-top: 18px !important;
+}
+html:not(.xread-browser) .config-content h2:nth-of-type(3) {
+    margin-top: 6px !important;
+}
+
+/* =====================================================================
+   r95 / v1.0.48.95 三区块等距优化
+   ---------------------------------------------------------------------
+   统一「配置字体 / 配置翻页 / 配置书籍」三个标题的上下外边距：
+   - 区块之间（上边距）：统一 10px —— 原来字体→翻页 16px、翻页→书籍 8px
+     不等距，根因是 r94 对第三个标题单独设了 6px；此处全部归一为 10px。
+   - 标题到内容（下边距）：统一 8px，书籍内容区上边距也归一为 8px。
+   实测：两处区块间距均为 10px、三处标题到内容均为 8px，弹窗整体再缩约 16px。
+   ===================================================================== */
+html:not(.xread-browser) .config-content h2:nth-of-type(1),
+html:not(.xread-browser) .config-content h2:nth-of-type(2),
+html:not(.xread-browser) .config-content h2:nth-of-type(3) {
+    margin-top: 10px !important;
+    margin-bottom: 8px !important;
+}
+html:not(.xread-browser) .config-content .book-mgmt-section {
+    margin-top: 8px !important;
+}

@@ -55,8 +55,20 @@ function setLoginText(id, text) {
     if (el) el.innerHTML = text;
 }
 
+// 页面内提示条：登录异常/翻页失败用可见文字代替 alert（老 Kindle 上 alert 常被拦截或看不到原因）
+function showNotice(id, message) {
+    var el = document.getElementById(id);
+    if (!el) { if (message) alert(message); return; }
+    if (!message) { el.innerHTML = ""; el.style.display = "none"; return; }
+    el.innerHTML = message;
+    el.style.display = "block";
+}
+function showLoginError(message) { showNotice("loginError", message); }
+function clearLoginError() { showNotice("loginError", ""); }
+
 // 「没有账号？注册」<->「已有账号？登录」
 function toggleLoginMode() {
+    clearLoginError();
     if (loginMode === "login") {
         loginMode = "register";
         setLoginText("loginTitle", "注册");
@@ -328,7 +340,9 @@ function formatChapterContent(content) {
     var lines = normalized.split("\n");
     var formattedLines = [];
     for (var i = 0; i < lines.length; i++) {
-        var line = lines[i].replace(/\t/g, " ").trim();
+        // Kindle WebKit 534 的 trim() 不识别全角空格(U+3000)/不间断空格(\u00A0)，
+        // 纯空白行会被当成正文段落渲染成整行空白，故显式去除。
+        var line = lines[i].replace(/\t/g, " ").replace(/^[\s\u3000\u00A0]+|[\s\u3000\u00A0]+$/g, "");
         // 去掉所有空行（含仅由空格/全角空格构成的行）
         if (line === "") {
             continue;
@@ -400,7 +414,18 @@ function errorLog(message) {
     }
 }
 
-function HttpGet(url, callback) {
+// 从非200响应体中提取后端给出的具体错误原因（后端 BadRequest 返回 400 + {isSuccess:false,errorMsg:"..."}）
+function extractErrorMsg(xhr) {
+    if (xhr.status === 0) return "无法连接服务器，请检查网络或地址";
+    var msg = "";
+    try {
+        var body = JSON.parse(xhr.responseText);
+        if (body && body.errorMsg) msg = String(body.errorMsg);
+    } catch (e) {}
+    return msg ? msg : ("服务器返回错误（" + xhr.status + "）");
+}
+
+function HttpGet(url, callback, onError) {
     loading();
     var xhr = new XMLHttpRequest();
     xhr.open('GET', url, true);
@@ -413,10 +438,12 @@ function HttpGet(url, callback) {
                 } catch (e) {
                     console.error("JSON解析错误:", e);
                     loadingOver();
+                    if (onError) onError("服务器返回的数据异常");
                 }
             } else {
                 console.error("Request failed with status: " + xhr.status);
                 loadingOver();
+                if (onError) onError(extractErrorMsg(xhr));
             }
         }
     };
@@ -428,7 +455,7 @@ function HttpGet(url, callback) {
     xhr.send();
 }
 
-function HttpPost(url, data, callback) {
+function HttpPost(url, data, callback, onError) {
     loading();
     var xhr = new XMLHttpRequest();
     xhr.open('POST', url, true);
@@ -443,10 +470,12 @@ function HttpPost(url, data, callback) {
                 } catch (e) {
                     console.error("JSON解析错误:", e);
                     loadingOver();
+                    if (onError) onError("服务器返回的数据异常");
                 }
             } else {
                 console.error("Request failed with status: " + xhr.status);
                 loadingOver();
+                if (onError) onError(extractErrorMsg(xhr));
             }
         }
     };
@@ -823,7 +852,9 @@ function loadCoverImage(img, retryCount) {
     
     image.onload = function() {
         img.src = dataSrc;
-        img.classList.remove('lazy-cover', 'cover-loading');
+        // WebKit534 的 DOMTokenList.remove 只处理第一个参数，拆成两次单参数调用
+        img.classList.remove('lazy-cover');
+        img.classList.remove('cover-loading');
         img.classList.add('cover-loaded');
         img.removeAttribute('data-src');
         lazyLoadedCovers[dataSrc] = true;
@@ -1423,7 +1454,14 @@ function disposeBookContent(targetChapterIndex, bookStr) {
         pageList = imgList;
     } else {
         isComicMode = false;
-        bookStr = currentChapterName + "\n" + formatChapterContent(bookStr);
+        // r92 修复标题与正文之间的多余空行：
+        // 章节标题来自目录，正文由后端返回。二者各自可能带前导/尾随换行或空白，
+        // 直接拼接会在标题和正文之间产生多个连续换行，Kindle 上渲染成约两行空白。
+        // 这里先各自去掉首尾空白，再只用一个换行连接，保证标题紧贴正文。
+        var cleanTitle = String(currentChapterName).replace(/^[\s\u3000\u00A0]+|[\s\u3000\u00A0]+$/g, "");
+        // 只去掉首尾的换行符，保留 formatChapterContent 给首行加的全角缩进
+        var cleanBody = formatChapterContent(bookStr).replace(/^\n+|\n+$/g, "");
+        bookStr = cleanTitle + "\n" + cleanBody;
         pageList = calculateCharsPerPage(bookStr);
     }
     currentBookPage = 1;
@@ -1449,7 +1487,11 @@ function showContent(pages) {
     } else {
         var pageHtml = pages[currentBookPage - 1].replace(/\n/g, '<br>');
         // 兜底：压缩连续换行，避免正文出现大面积空白行
-        pageHtml = pageHtml.replace(/(<br\s*\/?>\s*){2,}/gi, '<br>');
+        // 空白字符含全角空格(U+3000)/不间断空格(\u00A0)，老 WebKit 下 \s 不一定覆盖，显式列出
+        // r92：标题后若仍有连续 <br>（含全角空格填充的空行），一律压成单个
+        pageHtml = pageHtml.replace(/(<br[\s\u3000\u00A0]*\/?>[\s\u3000\u00A0]*){2,}/gi, '<br>');
+        // 去掉正文开头紧贴的 <br>（标题换行后不再留空行）
+        pageHtml = pageHtml.replace(/^(<br[\s\u3000\u00A0]*\/?>)+/i, '');
         contentElement.innerHTML = pageHtml;
     }
     setContentPageInfo();
@@ -1520,7 +1562,9 @@ function handleSaveProgressResponse(res, targetChapterIndex, saveTime) {
                   ", 耗时:" + elapsed + "ms");
         
         // 更新本地记录的当前章节索引
-        currentChapterIndex = targetChapterIndex;
+        // r96 修复：归一化为数字，避免字符串索引污染导致翻章时 +1 变字符串拼接（序章翻页失效）
+        var normalizedIndex = parseInt(targetChapterIndex, 10);
+        currentChapterIndex = isNaN(normalizedIndex) ? 0 : normalizedIndex;
     } else {
         errorLog("进度保存失败: " + (res ? res.errorMsg : "未知错误"));
     }
@@ -1529,7 +1573,9 @@ function handleSaveProgressResponse(res, targetChapterIndex, saveTime) {
 
 // 同步保存进度（用于页面卸载等关键场景）
 function saveReadProcessSync(targetChapterIndex, bookUrl) {
-    if (!targetChapterIndex || !bookUrl) return;
+    // r96 修复：原 !targetChapterIndex 会把序章(index=0)误判为无效而跳过保存
+    if (targetChapterIndex === null || targetChapterIndex === undefined || 
+        targetChapterIndex === '' || !bookUrl) return;
     
     var xhr = new XMLHttpRequest();
     var params = {
@@ -1558,35 +1604,40 @@ function saveReadProcessSync(targetChapterIndex, bookUrl) {
     }
 }
 
-// 使用隐藏的div测量文本高度
-function textMeasurerHigh(text) {
-    if (!textMeasurer) return 0;
-    // 获取内容元素的计算样式
-    var computedStyle = window.getComputedStyle(contentElement); 
-    // 应用关键样式到测量元素
+// r72 性能优化：把测量器样式同步与「读高度」分离。
+// 原实现每次测量都 getComputedStyle + 写10个样式 + innerHTML + 读 offsetHeight，
+// 在分页二分循环里被调用几十~上百次，每次都是一次强制同步重排（reflow）。
+// 拆出 syncMeasurerStyle()，在每批分页开始前只做一次；测量时只改内容+读高度。
+// 注意：fontWeight 由 updateElementFontStyle 直接写入测量器内联样式，此处不覆盖，
+// 与原实现一致（原实现也未设置 fontWeight），保证测量结果完全相同。
+function syncMeasurerStyle() {
+    if (!textMeasurer) return;
+    var computedStyle = window.getComputedStyle(contentElement);
     textMeasurer.style.fontFamily = computedStyle.fontFamily;
     textMeasurer.style.fontSize = computedStyle.fontSize;
     textMeasurer.style.letterSpacing = computedStyle.letterSpacing;
     textMeasurer.style.lineHeight = computedStyle.lineHeight;
-    // 确保测量元素与内容元素具有相同的宽度和内边距
     textMeasurer.style.width = computedStyle.width;
-    // 应用内容元素的内边距
     textMeasurer.style.paddingLeft = computedStyle.paddingLeft;
     textMeasurer.style.paddingRight = computedStyle.paddingRight;
     textMeasurer.style.paddingTop = computedStyle.paddingTop;
     textMeasurer.style.paddingBottom = computedStyle.paddingBottom;
-    // 重置可能影响测量的样式
     textMeasurer.style.margin = "0";
     textMeasurer.style.border = "none";
     textMeasurer.style.boxSizing = "border-box";
-    // 设置文本内容
+}
+
+// 使用隐藏的div测量文本高度（仅改内容 + 读高度，避免重复重排）
+function textMeasurerHigh(text) {
+    if (!textMeasurer) return 0;
     textMeasurer.innerHTML = text.replace(/\n/g, '<br>');
-    // 返回精确高度
     return textMeasurer.offsetHeight;
 }
 
 // 计算每页显示的字符内容
 function calculateCharsPerPage(bookStr) {
+    // r72：样式同步只做一次（原为每次测量都做），大幅减少强制重排
+    syncMeasurerStyle();
     var containerHeight = contentElement.clientHeight;
     var pages = [];
     var currentPage = "";
@@ -1648,6 +1699,16 @@ function calculateCharsPerPage(bookStr) {
 // 获取书籍内容页面
  function getBookContentPage(targetChapterIndex, bookUrl, pageNo, lastPage) {
     freshTime();
+    // r96 修复（根因）：章节索引统一归一化为数字。
+    // 进度保存回调曾把 currentChapterIndex 赋成字符串（如 "0"），导致：
+    //   1) 严格比较 targetChapterIndex !== currentChapterIndex 时 0 !== "0" 成立，
+    //      误判为切换章节而重新加载本章（序章点下一页无反应）；
+    //   2) currentChapterIndex + 1 变成 "01" 字符串拼接，翻到错误章节。
+    // 在入口处把目标索引和全局索引都规范化，后续所有比较/运算即安全。
+    targetChapterIndex = parseInt(targetChapterIndex, 10);
+    if (isNaN(targetChapterIndex)) targetChapterIndex = 0;
+    var normalizedCur = parseInt(currentChapterIndex, 10);
+    if (!isNaN(normalizedCur)) currentChapterIndex = normalizedCur;
     // 优先检查预加载缓存
     var preloadedContent = getPreloadedContent(targetChapterIndex);
     if (preloadedContent && targetChapterIndex !== currentChapterIndex) {
@@ -1699,24 +1760,31 @@ function calculateCharsPerPage(bookStr) {
     }
 
     // 处理当前章节内的翻页
+    // r96 修复：章节索引先归一化为数字。历史上 currentChapterIndex 在进度保存回调
+    // （handleSaveProgressResponse）里可能被赋成字符串（如 "0"），此时下面的
+    // currentChapterIndex + 1 会变成字符串拼接 "01" 而非数字 1，导致跨章翻页时
+    // 用错误的章节地址重新加载本章（表现为序章(index=0)点下一页无反应）。
+    // 统一 parseInt 后，"0" -> 0，0+1 -> 1，翻章恢复正常。
+    var curIdx = parseInt(currentChapterIndex, 10);
+    if (isNaN(curIdx)) curIdx = 0;
     if (pageNo <= 0) {
-        if (currentChapterIndex <= 0 && currentBookPage <= 1) {
+        if (curIdx <= 0 && currentBookPage <= 1) {
             loadingOver();
             return;
         }
         if (currentBookPage <= 1) {
-            getBookContentPage(currentChapterIndex - 1, bookUrl, 0, true);
+            getBookContentPage(curIdx - 1, bookUrl, 0, true);
             return;
         }
         pageNo = currentBookPage - 1;
     } else if (pageNo > currentBookTotalPage) {
-        if (currentChapterIndex >= bookChapterMapCache.length - 1 && 
+        if (curIdx >= bookChapterMapCache.length - 1 && 
             currentBookPage >= currentBookTotalPage) {
             loadingOver();
             return;
         }
         if (currentBookPage >= currentBookTotalPage) {
-            getBookContentPage(currentChapterIndex + 1, bookUrl, 1, false);
+            getBookContentPage(curIdx + 1, bookUrl, 1, false);
             return;
         }
         pageNo = currentBookPage + 1;
@@ -2822,11 +2890,12 @@ function initEventHandlers() {
     // 移除旧的点击事件监听器（如果存在）
     document.removeEventListener('click', globalClickHandler);
     // 添加统一的点击事件处理器
-    document.addEventListener('click', globalClickHandler, { passive: true });
+    // WebKit534 第三参数只认布尔值；传对象会被当作 true（捕获阶段）且无法被 removeEventListener(false) 移除
+    document.addEventListener('click', globalClickHandler, false);
     // 移除旧的滚动监听器
     window.removeEventListener('scroll', scrollHandler);
     // 添加滚动监听器
-    window.addEventListener('scroll', scrollHandler, { passive: true });
+    window.addEventListener('scroll', scrollHandler, false);
     // 立即检查一次可见封面
     setTimeout(checkVisibleCovers, 100);
 }
@@ -2885,6 +2954,41 @@ function resetViewportScale() {
 function initInputZoomGuard() {
     // r22 回退：还原原始代码「不干预聚焦缩放」的行为，空实现仅为兼容调用点。
     return;
+}
+
+/* r93) 字体配置区 −/+ 步进按钮
+   点击后按 data-step-delta 增减对应输入框，钳制在 [min,max]；
+   行距保留 1 位小数，字号/字距为整数；改值后派发 change 触发即时生效。
+   纯 ES5 + DOM Level 2 事件，兼容 Kindle WebKit 534。 */
+function initFontSteppers() {
+    var btns = document.querySelectorAll('.fc-step-btn');
+    var i;
+    for (i = 0; i < btns.length; i++) {
+        btns[i].addEventListener('click', function () {
+            var targetId = this.getAttribute('data-step-target');
+            var delta = parseFloat(this.getAttribute('data-step-delta'));
+            var min = parseFloat(this.getAttribute('data-step-min'));
+            var max = parseFloat(this.getAttribute('data-step-max'));
+            var input = document.getElementById(targetId);
+            if (!input || isNaN(delta)) return;
+            var cur = parseFloat(input.value);
+            if (isNaN(cur)) cur = isNaN(min) ? 0 : min;
+            var next = cur + delta;
+            if (!isNaN(min) && next < min) next = min;
+            if (!isNaN(max) && next > max) next = max;
+            // 行距步进 0.1，需保留 1 位小数避免 1.3000000000000003
+            if (Math.abs(delta) < 1) {
+                next = Math.round(next * 10) / 10;
+                input.value = next.toFixed(1);
+            } else {
+                input.value = String(Math.round(next));
+            }
+            // 派发 change，复用即时生效链路（applyConfigLive）
+            var evt = document.createEvent('HTMLEvents');
+            evt.initEvent('change', true, true);
+            input.dispatchEvent(evt);
+        }, false);
+    }
 }
 
 function initEventListeners() {
@@ -2946,6 +3050,8 @@ function initEventListeners() {
             });
         }
     }
+    // r93) 字体配置区 −/+ 步进按钮：改值后手动派发 change，复用上面的即时生效链路
+    initFontSteppers();
     var pageRadios = document.querySelectorAll('input[name="changePageFunNum"]');
     for (var ri = 0; ri < pageRadios.length; ri++) {
         pageRadios[ri].addEventListener('change', applyConfigLive);
@@ -3184,6 +3290,11 @@ function loginBookshelf() {
     } else if (type == "multi") {// 多用户模式
         config.username = $("#username").value;
         config.password = $("#password").value;
+        clearLoginError();
+        if (!config.username || !config.password) {
+            showLoginError(loginMode === "register" ? "请填写用户名和密码" : "请输入用户名和密码");
+            return;
+        }
 
         var params = {
                 isLogin: (loginMode !== "register"),
@@ -3195,16 +3306,23 @@ function loginBookshelf() {
         HttpPost(url(login_url), params, function(res) {
             if (res && res.isSuccess) {
                 accessToken = res.data.accessToken;
+                clearLoginError();
                 getBookshelf();
             } else {
                 show("#login");
                 accessToken = null;
-                alert(res ? res.errorMsg : (loginMode === "register" ? "注册失败" : "登录失败"));
+                showLoginError(res && res.errorMsg ? res.errorMsg :
+                    (loginMode === "register" ? "注册失败，请稍后重试" : "用户名或密码错误"));
             }
+            loadingOver();
+        }, function(reason) {
+            show("#login");
+            accessToken = null;
+            showLoginError(reason);
             loadingOver();
         });
     } else {
-        alert('服务器类型设置失败！');
+        showLoginError('服务器类型设置失败！');
     }
 }
 

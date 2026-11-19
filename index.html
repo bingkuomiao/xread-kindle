@@ -37,11 +37,11 @@
     <title>阅读</title>
     <link rel="icon" type="image/png" href="img/favicon.png">
     <link rel="icon" href="img/favicon.ico">
-    <link rel="stylesheet" href="css/kindle.css"/>
-    <link rel="stylesheet" href="css/other.css"/>
-    <script type="application/javascript">window.__XREAD_CONFIG__ = {"secure":true,"appVersion":"1.0.48","frontVersion":"1.0.48.69","debug":"off"};</script>
+    <link rel="stylesheet" href="css/kindle.css?v=1.0.48.103"/>
+    <link rel="stylesheet" href="css/other.css?v=1.0.48.103"/>
+    <script type="application/javascript">window.__XREAD_CONFIG__ = {"secure":true,"appVersion":"1.0.48","frontVersion":"1.0.48.103","debug":"off"};</script>
     <!-- 引入配置文件 -->
-    <script type="application/javascript" src="js/config.js"></script>
+    <script type="application/javascript" src="js/config.js?v=1.0.48.103"></script>
 </head>
 <body>
 
@@ -72,6 +72,9 @@
                 <!-- 标题与说明文字；点击底部「注册」时由 JS 就地改文字（不替换元素，保证事件仍有效） -->
                 <h1 class="login-title" id="loginTitle">登录</h1>
                 <p class="login-subtitle" id="loginSubtitle">登录以同步你的阅读数据</p>
+
+                <!-- 登录异常原因提醒：默认隐藏，失败时由 showLoginError() 显示 -->
+                <div id="loginError" class="login-error"></div>
 
                 <div class="serverSecured">
                     <div class="form-row login-field">
@@ -166,46 +169,57 @@
     <div class="modal-content">
         <span class="close" data-action="hide" data-target=".font-config">&times;</span>
         <form role="form" class="config-content">
-            <!-- 字体样式设置区域 -->
+            <!-- 字体样式设置区域（r93 附件样式：标签 | 数值/下拉 | 加减按钮 三列） -->
             <h2><span class="sec-no">01</span>配置字体</h2>
-            <div class="form-row">
-            <label for="font-config" class="form-label">字体</label>
-            <div class="input-wrapper">
-                <div class="font-selector">
-                    <!-- 只保留 4 种字体并使用短名，短名即显示名、也是配置项的值 -->
-                    <select id="fontFamily" class="form-control">
+            <div class="font-cfg">
+            <div class="form-row fc-row">
+                <label for="fontFamily" class="form-label">字体</label>
+                <div class="input-wrapper fc-value">
+                    <select id="fontFamily" class="form-control fc-select">
                         <option>系统</option>
                         <option>云朵</option>
                         <option>圆体</option>
                         <option>楷体</option>
                     </select>
-                    <div class="bold-control">
-                        <input type="checkbox" id="contentFontWight" class="checkbox-control">
-                        <label for="contentFontWight" class="bold-label">加粗</label>
-                    </div>
                 </div>
-            </div>
-            </div>
-
-            <div class="form-row">
-            <label for="font-config" class="form-label">字号</label>
-            <div class="input-wrapper">
-                <input type="number" id="contentFontSize" value="" class="form-control number-input">
+                <div class="fc-action">
+                    <input type="checkbox" id="contentFontWight" class="checkbox-control fc-hidden-cb">
+                    <label for="contentFontWight" class="form-control fc-bold-btn">加粗</label>
                 </div>
             </div>
 
-            <div class="form-row">
-            <label for="font-config" class="form-label">字距</label>
-            <div class="input-wrapper">
-                <input type="number" id="letterSpacing" value="" class="form-control number-input">
+            <div class="form-row fc-row">
+                <label for="contentFontSize" class="form-label">字号</label>
+                <div class="input-wrapper fc-value fc-num">
+                    <input type="number" id="contentFontSize" value="" class="form-control number-input">
+                    <span class="fc-unit">px</span>
+                </div>
+                <div class="fc-action">
+                    <button type="button" class="fc-step-btn" data-step-target="contentFontSize" data-step-delta="-1" data-step-min="12" data-step-max="72" aria-label="减小字号">&#8722;</button><button type="button" class="fc-step-btn" data-step-target="contentFontSize" data-step-delta="1" data-step-min="12" data-step-max="72" aria-label="增大字号">+</button>
                 </div>
             </div>
 
-            <div class="form-row">
-            <label for="font-config" class="form-label">行距</label>
-            <div class="input-wrapper">
-                <input type="number" id="lineHeight" value="" step="0.1" class="form-control number-input">
+            <div class="form-row fc-row">
+                <label for="letterSpacing" class="form-label">字距</label>
+                <div class="input-wrapper fc-value fc-num">
+                    <input type="number" id="letterSpacing" value="" class="form-control number-input">
+                    <span class="fc-unit">px</span>
                 </div>
+                <div class="fc-action">
+                    <button type="button" class="fc-step-btn" data-step-target="letterSpacing" data-step-delta="-1" data-step-min="0" data-step-max="30" aria-label="减小字距">&#8722;</button><button type="button" class="fc-step-btn" data-step-target="letterSpacing" data-step-delta="1" data-step-min="0" data-step-max="30" aria-label="增大字距">+</button>
+                </div>
+            </div>
+
+            <div class="form-row fc-row">
+                <label for="lineHeight" class="form-label">行距</label>
+                <div class="input-wrapper fc-value fc-num">
+                    <input type="number" id="lineHeight" value="" step="0.1" class="form-control number-input">
+                    <span class="fc-unit">倍</span>
+                </div>
+                <div class="fc-action">
+                    <button type="button" class="fc-step-btn" data-step-target="lineHeight" data-step-delta="-0.1" data-step-min="1" data-step-max="3.5" aria-label="减小行距">&#8722;</button><button type="button" class="fc-step-btn" data-step-target="lineHeight" data-step-delta="0.1" data-step-min="1" data-step-max="3.5" aria-label="增大行距">+</button>
+                </div>
+            </div>
             </div>
             
             <!-- 翻页方式区域 -->
@@ -335,8 +349,7 @@
         </div>
         <div class="modal-menu">
             <div class="modal-menu-left">
-                <button data-action="getChapterList" data-args="1,showChapterListNum,true">刷新</button>
-                <button data-action="jumpChapterList" data-args="-1">上一页</button>
+                <button data-action="getChapterList" data-args="1,showChapterListNum,true">刷新</button><button data-action="jumpChapterList" data-args="-1">上一页</button>
             </div>
 
             <div class="modal-menu-right">
@@ -372,9 +385,7 @@
         </div>
         <div class="modal-menu">
             <div class="modal-menu-bookmanage">
-                <button data-action="cacheBookItem">缓存书籍</button>
-                <button data-action="moveBookItem">移动书籍</button>
-                <button data-action="deleteBookItem">移除书籍</button>
+                <button data-action="cacheBookItem">缓存书籍</button><button data-action="moveBookItem">移动书籍</button><button data-action="deleteBookItem">移除书籍</button>
             </div>
         </div>
         <!-- 通用提示（缓存进度等） -->
@@ -402,5 +413,5 @@
 <!-- 引入调试文件 -->
 <!-- <script type="application/javascript" src="js/test.js"></script> -->
 <!-- 引入主程序文件 -->
-<script type="application/javascript" src="js/kindle.js"></script>
+<script type="application/javascript" src="js/kindle.js?v=1.0.48.103"></script>
 </html>

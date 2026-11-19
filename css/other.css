@@ -1415,3 +1415,196 @@
     box-sizing: border-box !important;
     -webkit-box-sizing: border-box !important;
 }
+
+/* =====================================================================
+   r93 / v1.0.48.93 字体配置区按附件重排 —— 手机/PC 适配（.xread-browser）
+   结构与 Kindle 完全一致，仅字号/尺寸按端缩小
+   ===================================================================== */
+.xread-browser .config-content .font-cfg { width: 100% !important; }
+.xread-browser .config-content .fc-row {
+    display: table !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 4px 0 !important;
+    border-bottom: 1px solid #E6E6E6;
+    line-height: 34px !important;
+}
+.xread-browser .config-content .fc-row:first-child { border-top: 1px solid #E6E6E6; }
+.xread-browser .config-content .fc-row > .form-label,
+.xread-browser .config-content .fc-row > .fc-value,
+.xread-browser .config-content .fc-row > .fc-action {
+    display: table-cell !important;
+    vertical-align: middle !important;
+    float: none !important;
+}
+.xread-browser .config-content .fc-row > .form-label {
+    width: 24% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 34px !important;
+    text-align: left !important;
+    font-size: 15px !important;
+    font-weight: bold !important;
+    color: #111 !important;
+    white-space: nowrap !important;
+}
+.xread-browser .config-content .fc-row > .fc-value { width: 48% !important; }
+.xread-browser .config-content .fc-row > .fc-action { width: 28% !important; text-align: right !important; }
+
+.xread-browser .config-content h2 .sec-no {
+    display: inline-block !important;
+    background: #000 !important;
+    color: #FFF !important;
+    font-size: 12px !important;
+    font-weight: bold !important;
+    line-height: 18px !important;
+    padding: 0 6px !important;
+    margin-right: 8px !important;
+    vertical-align: middle !important;
+}
+
+.xread-browser .config-content .fc-select {
+    display: inline-block !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: 34px !important;
+    line-height: 32px !important;
+    padding: 0 8px !important;
+    margin: 0 !important;
+    border: 1px solid #000 !important;
+    border-radius: 0 !important;
+    background: #FFF !important;
+    font-family: inherit !important;
+    font-size: 14px !important;
+    color: #000 !important;
+    vertical-align: middle !important;
+    box-sizing: border-box !important;
+    -webkit-box-sizing: border-box !important;
+}
+
+.xread-browser .config-content .fc-num input.number-input {
+    display: inline-block !important;
+    width: 50px !important;
+    max-width: 50px !important;
+    height: 34px !important;
+    line-height: 34px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    font-family: inherit !important;
+    font-size: 18px !important;
+    font-weight: bold !important;
+    color: #111 !important;
+    text-align: left !important;
+    vertical-align: middle !important;
+    -webkit-appearance: none;
+    appearance: none;
+}
+.xread-browser .config-content .fc-num input.number-input::-webkit-inner-spin-button,
+.xread-browser .config-content .fc-num input.number-input::-webkit-outer-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
+}
+.xread-browser .config-content .fc-unit {
+    display: inline-block !important;
+    font-size: 11px !important;
+    line-height: 34px !important;
+    color: #999 !important;
+    vertical-align: middle !important;
+    margin-left: 2px !important;
+}
+
+.xread-browser .config-content .fc-hidden-cb { display: none !important; }
+.xread-browser .config-content .fc-bold-btn {
+    display: inline-block !important;
+    width: 69px !important; /* 与下方 −/+ 两按钮总宽对齐：32*2 + 间距5 */
+    height: 32px !important;
+    line-height: 30px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 1px solid #000 !important;
+    border-radius: 0 !important;
+    background: #FFF !important;
+    color: #000 !important;
+    font-family: inherit !important;
+    font-size: 13px !important;
+    font-weight: bold !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    box-sizing: border-box !important;
+    -webkit-box-sizing: border-box !important;
+    cursor: pointer;
+}
+.xread-browser .config-content .fc-hidden-cb:checked + .fc-bold-btn {
+    background: #000 !important;
+    color: #FFF !important;
+}
+
+.xread-browser .config-content .fc-step-btn {
+    display: inline-block !important;
+    width: 32px !important;
+    height: 32px !important;
+    line-height: 30px !important;
+    padding: 0 !important;
+    margin: 0 0 0 5px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #000 !important;
+    color: #FFF !important;
+    font-family: inherit !important;
+    font-size: 18px !important;
+    font-weight: normal !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    box-sizing: border-box !important;
+    -webkit-box-sizing: border-box !important;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+}
+.xread-browser .config-content .fc-step-btn:active { background: #333 !important; }
+
+/* r93 补丁：#fontFamily 旧 ID 规则覆盖 */
+.xread-browser .config-content .font-cfg #fontFamily {
+    display: inline-block !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: 34px !important;
+    line-height: 32px !important;
+    padding: 0 8px !important;
+    margin: 0 !important;
+    border: 1px solid #000 !important;
+    border-radius: 0 !important;
+    background-color: #FFF !important;
+    font-family: inherit !important;
+    font-size: 14px !important;
+    color: #000 !important;
+    vertical-align: middle !important;
+    box-sizing: border-box !important;
+    -webkit-box-sizing: border-box !important;
+}
+
+/* =====================================================================
+   r94 / v1.0.48.94 三端一致微调：单位颜色加深 + 02/03 间距收紧
+   手机端 .modal padding-top 已在媒体查询为 10px，保持不变。
+   ===================================================================== */
+.xread-browser .config-content .fc-unit {
+    color: #5A5A5A !important;
+}
+.xread-browser .config-content h2:nth-of-type(3) {
+    margin-top: 5px !important;
+}
+
+/* =====================================================================
+   r95 / v1.0.48.95 三端一致：三区块等距（标题上10px / 下8px）
+   ===================================================================== */
+.xread-browser .config-content h2:nth-of-type(1),
+.xread-browser .config-content h2:nth-of-type(2),
+.xread-browser .config-content h2:nth-of-type(3) {
+    margin-top: 10px !important;
+    margin-bottom: 8px !important;
+}
+.xread-browser .config-content .book-mgmt-section {
+    margin-top: 8px !important;
+}
