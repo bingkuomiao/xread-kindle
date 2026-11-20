@@ -37,11 +37,11 @@
     <title>阅读</title>
     <link rel="icon" type="image/png" href="img/favicon.png">
     <link rel="icon" href="img/favicon.ico">
-    <link rel="stylesheet" href="css/kindle.css?v=1.0.48.103"/>
-    <link rel="stylesheet" href="css/other.css?v=1.0.48.103"/>
-    <script type="application/javascript">window.__XREAD_CONFIG__ = {"secure":true,"appVersion":"1.0.48","frontVersion":"1.0.48.103","debug":"off"};</script>
+    <link rel="stylesheet" href="css/kindle.css?v=1.0.48.138"/>
+    <link rel="stylesheet" href="css/other.css?v=1.0.48.138"/>
+    <script type="application/javascript">window.__XREAD_CONFIG__ = {"secure":true,"appVersion":"1.0.48","frontVersion":"1.0.48.138","debug":"off"};</script>
     <!-- 引入配置文件 -->
-    <script type="application/javascript" src="js/config.js?v=1.0.48.103"></script>
+    <script type="application/javascript" src="js/config.js?v=1.0.48.138"></script>
 </head>
 <body>
 
@@ -51,7 +51,7 @@
     <div id="login" class="c_login">
         <!-- 登录界面背景图 -->
         <div class="login-bg-bottom">
-            <img src="img/bg.jpg" alt="底部背景" class="login-bg-image">
+            <img src="img/bg.jpg?v=1.0.48.138" alt="底部背景" class="login-bg-image">
         </div>
         <form role="form" class="login-content">
             <div class="form-group">
@@ -81,6 +81,14 @@
                         <label for="username" class="login-field-label">用户名</label>
                         <div class="login-field-input">
                             <input type="text" class="form-control" id="username" placeholder="请输入用户名" autocomplete="username"/>
+                            <!-- v121: 占位文字覆盖层（仅 Kindle 端显示，PC/手机由 xread-browser 隔离隐藏）。
+                                 KPW3 老 WebKit 对 input 内部占位文字的垂直绘制位置 CSS 不可控
+                                 (v117 行高/v118 伪元素行高/v120 padding 三次真机均无效)，
+                                 改用普通 span 的 line-height 居中接管（普通元素行高 KPW3 生效）。 -->
+                            <span class="login-ph" id="phUsername">请输入用户名</span>
+                            <!-- v127: 输入镜像层——文本+行内光标，靠自然排版紧跟字符；
+                                 Kindle 端真实 input 文字透明由本层显示，输入先写缓存不碰真实 value -->
+                            <div class="input-mirror" id="mirrorUsername"><span class="im-text"></span><span class="im-caret"></span></div>
                         </div>
                     </div>
 
@@ -88,6 +96,10 @@
                         <label for="password" class="login-field-label">密码</label>
                         <div class="login-field-input">
                             <input type="password" class="form-control" id="password" placeholder="请输入密码" autocomplete="current-password"/>
+                            <span class="login-ph" id="phPassword">请输入密码</span>
+                            <!-- v127: 输入镜像层——文本+行内光标，靠自然排版紧跟字符；
+                                 Kindle 端真实 input 文字透明由本层显示，输入先写缓存不碰真实 value -->
+                            <div class="input-mirror" id="mirrorPassword"><span class="im-text"></span><span class="im-caret"></span></div>
                         </div>
                     </div>
                 </div>
@@ -375,7 +387,6 @@
         <span class="close" data-action="hide" data-target=".bookSourceList">&times;</span>
         <div class="modal-title-container">
             <h1 id="sourceTitle">书名</h1>
-            <img id="sourcing" class="source-loading" src="img/loading.gif">
         </div>
         <div id="sourceNameList" class="modal-list book-source-hidden">
             <div class="modal-columns-container">
@@ -413,5 +424,5 @@
 <!-- 引入调试文件 -->
 <!-- <script type="application/javascript" src="js/test.js"></script> -->
 <!-- 引入主程序文件 -->
-<script type="application/javascript" src="js/kindle.js?v=1.0.48.103"></script>
+<script type="application/javascript" src="js/kindle.js?v=1.0.48.138"></script>
 </html>
