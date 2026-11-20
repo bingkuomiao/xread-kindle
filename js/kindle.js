@@ -562,14 +562,16 @@ var showChapterListNum = 16,             // 目录显示的数量
     preloadCount = 16,                   // 最大预加载章节数，显示数目一半
     preloadedChaptersMapCache = {},      // 预加载缓存对象 - 存储已预加载的章节索引和内容 
     preloadTimer = null,                 // 限制预加载频率和数量
+    preloadStepTimer = null,             // v116: 预加载分批的单步定时器句柄（用于取消旧链）
+    preloadGeneration = 0,               // v116: 预加载代数令牌（章节切换递增，使旧链失效）
     lastPageTurnDirection = 0,           // 0=管理, 1=向下翻页, -1=向上翻页
     enablePreload = true;                // 是否启用预加载
 // 在性能优化配置部分添加滚动计数变量
-var lazyCoversCount = 8,                 // 预加载图片数量
+var lazyCoversCount = 12,                // 每批加载封面数（走后端代理+缓存后可适度加大，加快铺满）
     lazyLoadedCovers = {},
     lazyLoadInitialized = false,
     lazyScrollCount = 0,                 // 滚动次数计数
-    lazyScrollThreshold = 3;             // 滚动阈值，达到此值后强制加载图片
+    lazyScrollThreshold = 1;             // 滚动阈值：滚动1次即补加载，避免封面迟迟不出现
 // DOM元素引用
 var contentElement = null,
     textMeasurer = null,
@@ -961,6 +963,8 @@ function freshBookCache() {
     // 重置缓存数据
     preloadedChaptersMapCache = {};      // 初始化预加载缓存
     preloadTimer = null;                 // 限制预加载频率和数量
+    preloadStepTimer = null;             // v116: 重置单步定时器
+    preloadGeneration++;                 // v116: 换书时递增代数，作废任何在飞的旧预加载链
     lastPageTurnDirection = 0;           // 0=未知, 1=向下翻页, -1=向上翻页
     bookSourceMapCache = [];
     lastSourceIndex = 0;
@@ -1425,6 +1429,14 @@ function disposeChapterList(data, startIndex, endIndex, bookUrl, pageSize) {
  // 处理章节点击事件
 function handleChapterClick(target) {
     if (target.classList.contains('chapterName')) {
+        // v116: 章节跳转优先——立即递增代作废旧预加载链，清掉其单步定时器与 loading 残留。
+        // 这样目录打开时启动的批量缓存会停下，不再抢占跳转请求的带宽与 CPU。
+        preloadGeneration++;
+        if (preloadTimer) { clearTimeout(preloadTimer); preloadTimer = null; }
+        if (preloadStepTimer) { clearTimeout(preloadStepTimer); preloadStepTimer = null; }
+        for (var _pk in preloadedChaptersMapCache) {
+            if (preloadedChaptersMapCache[_pk] === 'loading') delete preloadedChaptersMapCache[_pk];
+        }
         var chapterIndex = parseInt(target.value);
         var chapterTitle = bookChapterMapCache[chapterIndex].title;
         setTitle(currentBookName, chapterTitle);
@@ -1458,10 +1470,8 @@ function clearMemory() {
     var cacheSize = Object.keys(preloadedChaptersMapCache).length;
     
     // 触发清理的条件
-    if (cacheSize > preloadCount * 2) {
-        preloadLog("缓存数量(" + cacheSize + ")超过阈值，触发智能清理");
-        smartClearPreloadCache();
-    } else if (cacheSize > preloadCount * 3) {
+    // v109修复: 原 else-if(>3倍) 被前置 if(>2倍) 拦截成死代码，调换顺序让严重超限的强制清理能真正执行。
+    if (cacheSize > preloadCount * 3) {
         preloadLog("缓存数量(" + cacheSize + ")严重超过阈值，强制清理");
         // 紧急情况下的强制清理
         for (var index in preloadedChaptersMapCache) {
@@ -1470,6 +1480,9 @@ function clearMemory() {
                 delete preloadedChaptersMapCache[chapterIndex];
             }
         }
+    } else if (cacheSize > preloadCount * 2) {
+        preloadLog("缓存数量(" + cacheSize + ")超过阈值，触发智能清理");
+        smartClearPreloadCache();
     }
 }
 
@@ -1548,22 +1561,35 @@ function handleBookContent(bookStr, targetChapterIndex, bookUrl, lastPage, callb
         return;
     }
 
-    disposeBookContent(targetChapterIndex, bookStr);
+    // v114 修复（进书跳回第一章根因）：
+    // 原实现这里传的是「尚未更新的」currentChapterIndex：
+    //  - 翻章时它是旧章号，恰好让 getBookContentPage 走章内翻页分支，用已分页的 pageList 渲染，看似正常；
+    //  - 但进书/返回书架后 freshBookCache 把 currentChapterIndex 置为 null，
+    //    getBookContentPage 入口 parseInt(null)=NaN 被归一化成 0，误判为「换章」而异步去请求第一章，
+    //    返回后覆盖 pageList，表现为「从已读章节跳回最开始章节」（进度其实已正确保存）。
+    // 修复：先把 targetChapterIndex 归一化并提前写入 currentChapterIndex，
+    //       使下面的 getBookContentPage 必走章内翻页分支、直接渲染已分页好的 pageList，杜绝多余的第一章请求；
+    //       同时保留旧章号 prevChapterIndex 供下方相邻章缓存判断，语义与原实现一致。
+    var normalizedTarget = parseInt(targetChapterIndex, 10);
+    if (isNaN(normalizedTarget)) normalizedTarget = 0;
+    var prevChapterIndex = currentChapterIndex;
+    
+    disposeBookContent(normalizedTarget, bookStr);
+    currentChapterIndex = normalizedTarget;
     getBookContentPage(currentChapterIndex, bookUrl, 1, lastPage);
     // 立即保存阅读进度（章节切换）
-    saveReadProcess(targetChapterIndex, bookUrl, true);
+    saveReadProcess(normalizedTarget, bookUrl, true);
     
-    // 更新章节缓存
-    if (targetChapterIndex == currentChapterIndex - 1) {
+    // 更新章节缓存（用旧章号判断翻章方向，语义与原实现一致）
+    if (normalizedTarget == prevChapterIndex - 1) {
         nextChapterContent = currentChapterContent;
         preChapterContent = null;
-    } else if (targetChapterIndex == currentChapterIndex + 1) {
+    } else if (normalizedTarget == prevChapterIndex + 1) {
         preChapterContent = currentChapterContent;
         nextChapterContent = null;
     }
     
     currentChapterContent = bookStr;
-    currentChapterIndex = parseInt(targetChapterIndex);
     
     // === 基于翻页方向的智能预加载 ===
     preloadLog("章节切换，翻页方向:", lastPageTurnDirection);
@@ -1629,13 +1655,22 @@ function startPreloadChapters(count, startOffset) {
         startOffset = 1;
     }
     
-    // 清除之前的预加载定时器
+    // v116: 递增代数——本次启动成为最新一代；任何旧链的异步回调持有旧 gen，会被校验拦截。
+    // 同时清掉旧链的调度定时器与新链自己的单步定时器，避免残留 trigger。
+    preloadGeneration++;
+    var myGen = preloadGeneration;
     if (preloadTimer) {
         clearTimeout(preloadTimer);
+    }
+    if (preloadStepTimer) {
+        clearTimeout(preloadStepTimer);
+        preloadStepTimer = null;
     }
     
     // 延迟执行，避免影响当前操作
     preloadTimer = setTimeout(function() {
+        // v116: 若等待期间代数已变（发生了章节跳转），放弃本次调度
+        if (myGen !== preloadGeneration) return;
         // 确定实际要预加载的章节数量
         var actualPreloadCount = Math.min(count, preloadCount);
         
@@ -1657,21 +1692,24 @@ function startPreloadChapters(count, startOffset) {
                    "章节:", chaptersToPreload);
         // 分批预加载
         if (chaptersToPreload.length > 0) {
-        preloadChaptersBatch(chaptersToPreload, 0);
+        preloadChaptersBatch(chaptersToPreload, 0, myGen);
         }
     }, 100);
 }
 
 // 分批预加载章节（内部实现）
-function preloadChaptersBatch(chapters, index) {
+// v116: 增加 gen 参数——每一步、每个回调都校验代数，代数过期则整条旧链立即停止，
+//       不再发新请求、不再写缓存、不再递归下一步，让章节跳转能抢占资源。
+function preloadChaptersBatch(chapters, index, gen) {
     if (index >= chapters.length) return;
+    if (gen !== preloadGeneration) return;  // v116: 代数过期，旧链终止
     
     var chapterIndex = chapters[index];
     
     // 再次检查是否已预加载（防止重复）
     if (preloadedChaptersMapCache[chapterIndex]) {
         preloadLog("章节 " + chapterIndex + " 已在缓存中，跳过预加载");
-        preloadChaptersBatch(chapters, index + 1);
+        preloadChaptersBatch(chapters, index + 1, gen);
         return;
     }
     // 标记为预加载中
@@ -1680,16 +1718,25 @@ function preloadChaptersBatch(chapters, index) {
     var params = buildBookContentParams(chapterIndex, currentBookUrl);
     
     // 延迟加载，避免同时发起太多请求
-    setTimeout(function() {
+    preloadStepTimer = setTimeout(function() {
+        // v116: 定时器触发时再校验一次（等待期间可能已发生跳转）
+        if (gen !== preloadGeneration) {
+            // 清掉本步遗留的 loading 标记，避免该章节永远卡在"加载中"而无法再缓存
+            if (preloadedChaptersMapCache[chapterIndex] === 'loading') delete preloadedChaptersMapCache[chapterIndex];
+            return;
+        }
         if (config.type == "app") {
             HttpGet(url(bookContent, params), function(res) {
+                // v116: 响应回来再校验，防止用旧章节结果污染缓存
+                if (gen !== preloadGeneration) return;
                 handlePreloadResponse(res, chapterIndex, currentBookUrl);
-                preloadChaptersBatch(chapters, index + 1);
+                preloadChaptersBatch(chapters, index + 1, gen);
             });
         } else {
             HttpPost(url(bookContent), params, function(res) {
+                if (gen !== preloadGeneration) return;
                 handlePreloadResponse(res, chapterIndex, currentBookUrl);
-                preloadChaptersBatch(chapters, index + 1);
+                preloadChaptersBatch(chapters, index + 1, gen);
             });
         }
     }, index * 100); // 每章间隔100ms
@@ -1992,39 +2039,6 @@ function handleSaveProgressResponse(res, targetChapterIndex, saveTime) {
         errorLog("进度保存失败: " + (res ? res.errorMsg : "未知错误"));
     }
     loadingOver();
-}
-
-// 同步保存进度（用于页面卸载等关键场景）
-function saveReadProcessSync(targetChapterIndex, bookUrl) {
-    // r96 修复：原 !targetChapterIndex 会把序章(index=0)误判为无效而跳过保存
-    if (targetChapterIndex === null || targetChapterIndex === undefined || 
-        targetChapterIndex === '' || !bookUrl) return;
-    
-    var xhr = new XMLHttpRequest();
-    var params = {
-        index: targetChapterIndex,
-        refresh: 1,
-        url: bookUrl
-    };
-    
-    if (currentBookName) params.name = currentBookName;
-    if (currentAuthor) params.author = currentAuthor;
-    
-    var urlStr = url(saveBookProgress);
-    
-    xhr.open('POST', urlStr, false); // 同步请求
-    xhr.setRequestHeader('Content-Type', 'application/json;charset=utf-8');
-    
-    if (config.type == "multi") {
-        xhr.withCredentials = true;
-    }
-    
-    try {
-        xhr.send(JSON.stringify(params));
-        preloadLog("同步保存进度完成，章节:" + targetChapterIndex);
-    } catch (e) {
-        errorLog("同步保存进度失败: " + e.message);
-    }
 }
 
 // r72 性能优化：把测量器样式同步与「读高度」分离。
@@ -3779,6 +3793,12 @@ function cleanupTimers() {
         clearTimeout(preloadTimer);
         preloadTimer = null;
     }
+    // v116: 同时取消预加载单步定时器并递增代数，确保退出登录时旧预加载链彻底失效
+    if (preloadStepTimer) {
+        clearTimeout(preloadStepTimer);
+        preloadStepTimer = null;
+    }
+    preloadGeneration++;
     if (lazyScrollTimeout) {
         clearTimeout(lazyScrollTimeout);
         lazyScrollTimeout = null;
@@ -3828,8 +3848,10 @@ function sendLogoutRequest() {
 
 function sendsaveReadRequest() {
     if (currentChapterIndex !== null && currentBookUrl) {
-        preloadLog("退出登录前保存进度");
-        saveReadProcessSync(currentChapterIndex, currentBookUrl);
+        preloadLog("v113: 退出登录前异步保存进度(forceSave=true 兜底，替代原同步XHR，避免弱网冻结主线程)");
+        // 用 forceSave=true 保证即使章节未变也发送；url() 在调用瞬间已把 accessToken 拼进 URL，
+        // 后续 logout 里 accessToken=null 不影响这条在途请求，无丢进度风险。
+        saveReadProcess(currentChapterIndex, currentBookUrl, true);
     }
 }
 
