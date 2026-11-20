@@ -790,15 +790,6 @@ function freshTime() {
   //$("#nowTime").textContent = formatTime("HH:mm");
 }
 
-// 转圈动画已取消：登录按钮下方的 loading.gif 不再引入。
-// 保留 loading()/loadingOver() 为空实现，供 HttpGet/HttpPost 等既有调用点继续使用，
-// 不再显示或隐藏任何加载动画元素。
-function loading() {
-}
-
-function loadingOver() {
-}
-
 //待实现
 function decode(password) {
   return password;
@@ -851,7 +842,6 @@ function extractErrorMsg(xhr) {
 }
 
 function HttpGet(url, callback, onError) {
-    loading();
     var xhr = new XMLHttpRequest();
     xhr.open('GET', url, true);
     xhr.onreadystatechange = function() {
@@ -862,12 +852,10 @@ function HttpGet(url, callback, onError) {
                     if (callback) callback(data);
                 } catch (e) {
                     console.error("JSON解析错误:", e);
-                    loadingOver();
                     if (onError) onError("服务器返回的数据异常");
                 }
             } else {
                 console.error("Request failed with status: " + xhr.status);
-                loadingOver();
                 if (onError) onError(extractErrorMsg(xhr));
             }
         }
@@ -881,7 +869,6 @@ function HttpGet(url, callback, onError) {
 }
 
 function HttpPost(url, data, callback, onError) {
-    loading();
     var xhr = new XMLHttpRequest();
     xhr.open('POST', url, true);
     xhr.setRequestHeader('Content-Type', 'application/json;charset=utf-8');
@@ -894,12 +881,10 @@ function HttpPost(url, data, callback, onError) {
                 if (callback) callback(response);
                 } catch (e) {
                     console.error("JSON解析错误:", e);
-                    loadingOver();
                     if (onError) onError("服务器返回的数据异常");
                 }
             } else {
                 console.error("Request failed with status: " + xhr.status);
-                loadingOver();
                 if (onError) onError(extractErrorMsg(xhr));
             }
         }
@@ -1081,9 +1066,7 @@ function getBookshelf() {
                 enterFullscreen();
                 // 立即初始化懒加载
                 initCoverLazyLoad(); 
-                loadingOver();
             } else {
-                loadingOver();
                 alert(res ? res.errorMsg : "获取书架失败");
             }
         });
@@ -1374,7 +1357,6 @@ function handleChapterListResponse(res, pageNo, startIndex, endIndex, pageSize, 
     } else {
         errorLog(res ? res.errorMsg : "获取章节列表失败");
     }
-    loadingOver();
 }
 
 // 创建按钮元素
@@ -2134,8 +2116,13 @@ function handleSaveProgressResponse(res, targetChapterIndex, saveTime) {
     } else {
         errorLog("进度保存失败: " + (res ? res.errorMsg : "未知错误"));
     }
-    loadingOver();
 }
+
+// v139 翻页性能：测量高度缓存。分页二分中大量重复测量相同文本前缀，
+// 命中缓存直接返回高度，跳过 innerHTML 写入 + offsetHeight 读取（一次强制重排）。
+// 缓存只影响「是否重测」，高度值与判定逻辑完全不变，故分页结果逐字符一致、绝不超高。
+// 每次 syncMeasurerStyle（切章 / 改字号行高）时清空，避免样式变化后命中旧高度。
+var textMeasureHeightCache = {};
 
 // r72 性能优化：把测量器样式同步与「读高度」分离。
 // 原实现每次测量都 getComputedStyle + 写10个样式 + innerHTML + 读 offsetHeight，
@@ -2158,13 +2145,21 @@ function syncMeasurerStyle() {
     textMeasurer.style.margin = "0";
     textMeasurer.style.border = "none";
     textMeasurer.style.boxSizing = "border-box";
+    // v139: 样式（字号/行高/字距/宽度）已同步，旧高度缓存失效，清空
+    textMeasureHeightCache = {};
 }
 
 // 使用隐藏的div测量文本高度（仅改内容 + 读高度，避免重复重排）
 function textMeasurerHigh(text) {
     if (!textMeasurer) return 0;
+    // v139: 命中缓存直接返回高度，跳过 DOM 写入 + 强制重排
+    if (Object.prototype.hasOwnProperty.call(textMeasureHeightCache, text)) {
+        return textMeasureHeightCache[text];
+    }
     textMeasurer.innerHTML = text.replace(/\n/g, '<br>');
-    return textMeasurer.offsetHeight;
+    var h = textMeasurer.offsetHeight;
+    textMeasureHeightCache[text] = h;
+    return h;
 }
 
 // 计算每页显示的字符内容
@@ -2193,6 +2188,12 @@ function calculateCharsPerPage(bookStr) {
             if (addNum === 1) {
                 if (currentPage.trim() != "") {
                     pages.push(currentPage);
+                }
+                // v139 翻页性能：复用本页实测确认的字符数作为下一页起始步长，
+                // 避免每页都从固定200重新二分。行高/字号/测量口径完全不变，
+                // 每页边界仍由 offsetHeight 实测决定，分页结果与旧算法逐字符一致，绝不超高。
+                if (currentPage.length > 0) {
+                    perAddNum = currentPage.length;
                 }
                 i -= 1;
                 tempPage = "";
@@ -2256,7 +2257,6 @@ function calculateCharsPerPage(bookStr) {
             }
             showContent(pageList);
             show(".menu");
-            loadingOver();
             // 确保进度保存
             saveReadProcess(targetChapterIndex, bookUrl, true);
             setTimeout(function() {
@@ -2282,7 +2282,6 @@ function calculateCharsPerPage(bookStr) {
             }
             showContent(pageList);
             show(".menu");
-            loadingOver();
             
             setTimeout(function() {
                     clearMemory();
@@ -2302,7 +2301,6 @@ function calculateCharsPerPage(bookStr) {
     if (isNaN(curIdx)) curIdx = 0;
     if (pageNo <= 0) {
         if (curIdx <= 0 && currentBookPage <= 1) {
-            loadingOver();
             return;
         }
         if (currentBookPage <= 1) {
@@ -2313,7 +2311,6 @@ function calculateCharsPerPage(bookStr) {
     } else if (pageNo > currentBookTotalPage) {
         if (curIdx >= bookChapterMapCache.length - 1 && 
             currentBookPage >= currentBookTotalPage) {
-            loadingOver();
             return;
         }
         if (currentBookPage >= currentBookTotalPage) {
@@ -2326,7 +2323,6 @@ function calculateCharsPerPage(bookStr) {
     currentBookPage = pageNo;
     showContent(pageList);
     show(".menu");
-    loadingOver();
     
     // 根据翻页方向和阅读位置进行智能预加载
     if (bookChapterMapCache && currentBookUrl) {
@@ -2346,19 +2342,16 @@ function calculateCharsPerPage(bookStr) {
 }
 
 function prePage() {
-    loading();
     lastPageTurnDirection = -1; // 记录为向上翻页
     jumpToBookContentPage(-1);
 }
 
 function nextPage() {
-    loading();
     lastPageTurnDirection = 1; // 记录为向下翻页
     jumpToBookContentPage(1);
 }
 
 function jumpToBookContentPage(offset) {
-    loading();
     // 记录翻页方向
     lastPageTurnDirection = offset > 0 ? 1 : -1;
     
@@ -2383,19 +2376,16 @@ function jumpSourcePage(offset) {
             return;
         }
         loadingP = $("#sourcing");
-        loading();
         getSourceList(targetPage, sourcePageSize, false);
         return;
     }
     
     loadingP = $("#sourcing");
-    loading();
     
     // 使用缓存数据直接翻页
     disposeSourceList(bookSourceMapCache, targetPage, sourcePageSize);
     updateSourcePageInfo();
     
-    loadingOver();
 }
 
 // 显示书籍管理弹窗（书源切换已停用）
@@ -2946,7 +2936,6 @@ function handleSourceListResponse(res, pageNo, pageSize) {
     } else {
         errorLog(res ? res.errorMsg : "获取书源列表失败");
     }
-    loadingOver();
 }
 
 // 获取书源列表
@@ -2974,7 +2963,6 @@ function getSourceList(pageNo, pageSize, refresh) {
         }
         sourceFetching = true;
         loadingP = $("#sourcing");
-        loading();
         $("#sourceTitle").textContent = currentBookName;
 
         HttpGet(url(searchBookSource, params), function(res) {
@@ -2983,10 +2971,8 @@ function getSourceList(pageNo, pageSize, refresh) {
     } else {
         // 使用缓存数据分页显示
         loadingP = $("#sourcing");
-        loading();
         disposeSourceList(bookSourceMapCache, pageNo, pageSize);
         updateSourcePageInfo();
-        loadingOver();
     }
 }
 
@@ -3877,12 +3863,10 @@ function loginBookshelf() {
                 showLoginError(res && res.errorMsg ? res.errorMsg :
                     (loginMode === "register" ? "注册失败，请稍后重试" : "用户名或密码错误"));
             }
-            loadingOver();
         }, function(reason) {
             show("#login");
             accessToken = null;
             showLoginError(reason);
-            loadingOver();
         });
     } else {
         showLoginError('服务器类型设置失败！');
@@ -3956,7 +3940,6 @@ function cleanupMapCache() {
 function sendLogoutRequest() {
     if (config.type == "multi" || config.type == "single") {
         HttpPost(url(logout_url), null, function() {
-            loadingOver();
         });
         show('.serverSecured');
     }
