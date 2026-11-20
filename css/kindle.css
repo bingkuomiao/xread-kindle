@@ -1,21 +1,21 @@
 /* 字体路径和格式定义 */
 @font-face {
     font-family: "御风楷体";
-    src: url('../fonts/YuFengKaiTi.woff') format('woff');
+    src: url('../fonts/YuFengKaiTi.woff?v=1.0.48.110') format('woff');
     font-weight: normal;/*必须有，否则kindle有兼容性问题*/
     font-style: normal;
 }
 
 @font-face {
     font-family: "糯米圆体";
-    src: url('../fonts/NuoMiYuanTi.woff') format('woff');
+    src: url('../fonts/NuoMiYuanTi.woff?v=1.0.48.110') format('woff');
     font-weight: normal;
     font-style: normal;
 }
 
 @font-face {
     font-family: "云朵字体";
-    src: url('../fonts/yunduo.woff') format('woff');
+    src: url('../fonts/yunduo.woff?v=1.0.48.110') format('woff');
     font-weight: normal;
     font-style: normal;
 }
@@ -213,11 +213,18 @@ label {
     float: none;
     width: 100%;
     box-sizing: border-box;
+    position: relative; /* v121: 作为占位覆盖层 .login-ph 的定位基准 */
 }
 
 .login-content .form-control {
     width: 100%;
     height: 58px;
+    /* v121: v120 的「行高=字号+padding-top 下推」对占位文字真机仍无效——三次 CSS 试错
+       (v117 行高54/v118 伪元素行高54/v120 padding下推)证明 KPW3 老 WebKit 对 input 内部
+       占位文字的垂直绘制位置 CSS 不可控，占位已改由 .login-ph 覆盖层接管(见下方)。
+       本体保留 line-height:36px + padding:9px 12px 0：数学上正文行盒[9,45]中心27=content
+       中心54/2，输入正文保持居中；font-size 36px 是防 Kindle 聚焦放大的真机验证值，绝不动。 */
+    line-height: 36px;
     /* 聚焦放大修复：Kindle 浏览器 viewport 按 1072 物理像素布局、dpr≈1.8，
        26px CSS 实际仅约 14.5 物理像素，低于 WebKit 聚焦自动放大的 16px 阈值，
        点输入框就被放大且不恢复；恢复到历史真机验证过的 36px（实际约 64 物理像素）
@@ -231,14 +238,134 @@ label {
     border-radius: 12px;
     -webkit-border-radius: 12px;
     box-sizing: border-box;
-    padding: 0 12px;
+    padding: 9px 12px 0; /* v120: 上9下0 下推行盒至垂直中心(见上方说明) */
     margin: 0;
 }
 
-/* 占位文字为渐进增强；老浏览器不显示时，上方「用户名/密码」标签仍可辨认输入框 */
+/* ===== v121: 占位文字覆盖层方案（仅 Kindle 端生效）=====
+   三次 CSS 试错(v117/v118/v120)真机证明 KPW3 老 WebKit 对 input 内部占位文字的
+   垂直绘制位置不可控。改为：原生 placeholder 统一透明，由 .login-ph 普通 span
+   覆盖层(line-height 垂直居中，KPW3 对普通元素行高支持成熟)接管渲染。
+   PC/手机(html.xread-browser，Kindle UA 不加该类)强制隐藏覆盖层并恢复原生占位默认样式，
+   完全回退到本轮改动之前的行为。 */
 .login-content .form-control::-webkit-input-placeholder {
-    color: #6B7280;
+    color: transparent; /* v121: Kindle 端原生占位隐藏，由 .login-ph 接管 */
 }
+
+/* xread-browser = 非 Kindle UA(PC/手机)：恢复原生占位可见(近似浏览器默认灰)，
+   覆盖层隐藏——v115 缩小字号与 v117~v120 位置调整不再作用于 PC/手机端。 */
+.xread-browser .login-content .form-control::-webkit-input-placeholder {
+    color: #999;
+}
+.xread-browser .login-content .form-control::placeholder {
+    color: #999;
+}
+.xread-browser .login-content .login-ph {
+    display: none !important;
+}
+
+/* 占位覆盖层本体：绝对定位铺在 input 内容区上，行高=content 高实现垂直居中。
+   几何：input 高58(border上下各2)+content54 → top2 + height54，中心29=input几何中心29。
+   字号 26px ≈ 原 0.72em(36px) 的提示小字(v115 用户确认过的大小)。 */
+.login-content .login-ph {
+    display: none;            /* 默认隐藏；输入框为空时由 JS 加 .on 显示 */
+    position: absolute;
+    left: 14px;               /* 视觉对齐 input 文字起点(border2 + padding-left12) */
+    top: 2px;                 /* 越过 input 上 border，对齐内容区顶 */
+    height: 54px;             /* = input content 高(58-4) */
+    line-height: 54px;        /* 垂直居中：普通元素行高 KPW3 生效 */
+    font-size: 26px;
+    color: #6B7280;
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 92%;           /* 防长文案溢出输入框 */
+    pointer-events: none;     /* 点击穿透到 input；老内核不支持时由 JS onclick 兜底聚焦 */
+    z-index: 1;
+}
+.login-content .login-ph.on {
+    display: block;
+}
+
+/* ===== v127: 登录页虚拟键盘（仅 Kindle 端；面板 DOM 由 JS 动态创建，PC/手机不存在） =====
+   v128 样式：删除顶部公共数字行(数字移入123数字页)；防误触优化保留——间隙加大到8/8、
+   按键面积加大(键高82px)；纯黑字符 #000000 保留。满宽浅灰面板、display:table 等分键帽；
+   空格键缩短、登录键加长居中、删除键加长。行高=键高实现垂直居中(KPW3 生效)。 */
+.vk-panel {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    box-sizing: border-box;
+    background: #C6CCD3;
+    border-top: 2px solid #8F979F;
+    padding: 6px 6px 10px;
+    display: none;
+    z-index: 9999;
+}
+.vk-panel.on { display: block; }
+.vk-panel .vk-page-num { display: none; }
+.vk-panel.num .vk-page-num { display: block; }
+.vk-panel.num .vk-page-abc { display: none; }
+.vk-row {
+    display: table;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 8px 8px; /* v128: 防误触——间隙加大(6/5→8/8) */
+    width: 100%;
+    margin: 0;
+}
+.vk-key {
+    display: table-cell;
+    height: 82px; /* v128: 加大按键面积(68→82) */
+    line-height: 80px;
+    vertical-align: middle;
+    text-align: center;
+    font-size: 30px;
+    color: #000000; /* v125: 纯黑 */
+    background: #F5F7F9;
+    border: 1px solid #9CA3AB;
+    -webkit-border-radius: 6px;
+    border-radius: 6px;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+.vk-key-fn { background: #DDE2E8; }
+.vk-key-space { width: 20%; }  /* v131: 空格键调大(原6%)——字母页+数字页共用 */
+.vk-key-del { width: 16%; }    /* v127: 删除键加长(输错密码连删) */
+.vk-key-login { width: 20%; }  /* v127: 登录键加长(字母页) */
+.vk-key-narrow { width: 10%; } /* v131: 字母页 @/. 收窄为普通字母键大小(10%) */
+/* v131: 数字页收起键已去掉固定宽度(vk-key-short)，与登录键同为未指定宽度→平分剩余，二者等大 */
+/* v127: 输入镜像层——文本 span + 行内光标竖线，靠自然排版紧跟字符(KPW3 行高居中已验证)。
+   Kindle 端真实 input 文字由 JS 设透明，视觉全部由本层呈现；PC/手机不初始化，本层不显示。 */
+.login-content .input-mirror {
+    display: none;
+    position: absolute;
+    left: 14px;               /* 对齐 input 文字起点(border2 + padding-left12) */
+    top: 2px;                 /* 越过 input 上 border，对齐内容区顶 */
+    height: 54px;             /* = input content 高(58-4) */
+    line-height: 54px;
+    font-size: 36px;          /* 与 input 本体一致 */
+    color: #1B1F26;
+    white-space: pre;
+    overflow: hidden;
+    max-width: 92%;
+    pointer-events: none;
+    z-index: 2;
+}
+.login-content .input-mirror.on { display: block; }
+.login-content .input-mirror .im-caret {
+    display: inline-block;
+    width: 3px;
+    height: 36px;
+    line-height: 36px;
+    background: #000000;
+    vertical-align: middle;   /* 普通元素行内对齐，紧跟文本，无需测量宽度 */
+    margin-left: 1px;
+}
+/* v127: Kindle 端真实 input 文字透明，视觉由镜像层接管（PC/手机不加此类，保持原样） */
+.login-content .form-control.vk-mirror-on { color: transparent; }
+/* v123: 当前编辑输入框高亮（替代原生聚焦边框，不触发系统键盘） */
+.login-content .form-control.vk-input-active { border-color: #165DFF; }
 
 /* 登录按钮区域 */
 .login-content .button-group {
@@ -348,7 +475,7 @@ label {
     overflow: hidden;
     padding-top: 1px;
     margin-top: 1px;
-    transition: opacity 0.3s ease;
+    /* v119: 移除 opacity transition; JS 从未改 opacity, 属无效残留, KPW3 上徒增样式计算 */
 }
 
 /* 书籍信息文字样式 */
@@ -573,11 +700,6 @@ label {
     margin: 15px 0 10px 68px; /* 增加底部外边距从0到10px */
 }
 
-.source-loading {
-    display: inline-block;
-    margin-left: 15px;
-    position: relative;
-}
 /*************底部菜单设置按钮页面样式区*********************/
 .config-content {
     background-color: #FFF;
@@ -744,24 +866,10 @@ label {
     outline-offset: 1px;
 }
 
-/* 错峰入场动效：仅作用于设置弹窗的三个区块标题，轻量淡入上移；
-   使用 both 填充，动画不被支持或被打断时元素仍以最终态显示，绝不影响可读性。
-   Kindle WebKit 534 同时写 -webkit- 前缀与标准写法。 */
-@-webkit-keyframes xreadSecIn {
-    from { opacity: 0; -webkit-transform: translateY(6px); }
-    to   { opacity: 1; -webkit-transform: translateY(0); }
-}
-@keyframes xreadSecIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-.config-content h2 {
-    -webkit-animation: xreadSecIn 0.32s ease both;
-    animation: xreadSecIn 0.32s ease both;
-}
-.config-content h2:nth-of-type(1) { -webkit-animation-delay: 0s;    animation-delay: 0s; }
-.config-content h2:nth-of-type(2) { -webkit-animation-delay: 0.08s; animation-delay: 0.08s; }
-.config-content h2:nth-of-type(3) { -webkit-animation-delay: 0.16s; animation-delay: 0.16s; }
+/* v118: 移除三个区块标题的淡入上移动画。
+   原 animation(opacity:0 起 + 错峰 delay + both 填充)在 KPW3 电子墨水上被极慢重绘放大成
+   「三个标题和黑色分割线最后才加载」的观感。标题与 border-bottom 分割线同属 h2，一并受影响。
+   移除后标题静态立即显示，无任何视觉延迟；其余标题样式(margin/字号/序号方块)不受影响。 */
 
 .font-config button {
     margin: 10px;
@@ -889,6 +997,7 @@ label {
     margin-right: 2%;
 }
 
+/* v108: 目录章节项适度加高、扩大点击热区防误触；间距保持原值不拉开，维持原有紧凑美观（块级+固定px，兼容老 WebKit） */
 .modal-column button {
     width: 100%;
     text-align: left;
@@ -897,16 +1006,16 @@ label {
     font-size: 43px;
     color: #585656;
     cursor: pointer;
-    padding: 3px 5px;
+    padding: 8px 6px;
     margin: 5px 0;
     white-space: nowrap;
     overflow: hidden;
     display: block;
     line-height: 1.3;
     height: auto;
-    min-height: 30px;
+    min-height: 64px;
     border: 1px solid #ddd;
-    transition: all 0.3s ease;
+    /* v119: 移除 transition:all; 目录按钮频繁切 current/preloaded 类, KPW3 电子墨水会把 .3s 过渡放大成高亮延迟 */
 }
 
 /* 通用按钮状态样式 */
