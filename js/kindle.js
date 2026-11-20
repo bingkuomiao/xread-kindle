@@ -997,6 +997,9 @@ function createBookItemElement(book, index) {
     bookItem.className = 'book-item';
     
     // 处理封面URL
+    // 性能优化：所有书源封面统一走后端 /reader3/cover 代理。
+    // 后端按图片URL的md5做磁盘缓存(带防盗链Referer绕过) + 浏览器缓存86400s，
+    // 避免 Kindle 弱网直连外部图床导致加载慢/防盗链失败。与 Vue3 端 getCoverUrl 行为一致。
     var coverUrl = book.coverUrl;
     if (book.customCoverUrl) {
         coverUrl = book.customCoverUrl;
@@ -1004,8 +1007,18 @@ function createBookItemElement(book, index) {
 
     if (!coverUrl) {
         coverUrl = "img/noCover.jpg";
-    } else if (coverUrl.indexOf('http') !== 0) {
-        coverUrl = apiBase() + coverUrl;
+    } else {
+        // 已经是代理地址（含完整URL形式）则直接补全/使用，避免二次编码；
+        // 否则无论是外链还是相对路径，都包一层代理
+        var proxyTag = "/reader3/cover?path=";
+        var tagPos = coverUrl.indexOf(proxyTag);
+        if (tagPos === 0) {
+            coverUrl = apiBase() + coverUrl;
+        } else if (tagPos > 0 && coverUrl.indexOf('http') === 0) {
+            // 完整 URL 的代理地址，已带绝对地址，直接使用
+        } else {
+            coverUrl = apiBase() + proxyTag + encodeURIComponent(coverUrl);
+        }
     }
     
     // 构建书籍项HTML结构
@@ -1145,121 +1158,121 @@ function shouldForceLoadCovers() {
     return shouldForce;
 }
 
-// 视口检查
+// 视口检查：矩形相交即可（放宽判定，让首屏封面尽早加载）。
+// 只读 el 的位置，不写 DOM —— 供 checkVisibleCovers 的“纯读阶段”批量调用。
 function isElementInViewportKindle(el) {
     if (!el || typeof el.getBoundingClientRect !== 'function') {
         return false;
     }
-    
     try {
         var rect = el.getBoundingClientRect();
-        var viewportHeight = (window.innerHeight || document.documentElement.clientHeight) - 220;
-        var viewportWidth = window.innerWidth || document.documentElement.clientWidth;
-        
-        // 扩大检查范围，确保更多封面被加载
-        return (
-            rect.top >= -viewportHeight * 0.3 &&    // 向上扩展30%视口高度
-            rect.left >= -viewportWidth * 0.3 &&     // 向左扩展30%视口宽度
-            rect.bottom <= viewportHeight * 1.3 &&   // 向下扩展30%视口高度
-            rect.right <= viewportWidth * 1.3        // 向右扩展30%视口宽度
-        );
+        // 视口上下边界；向下多留半屏作为预取缓冲，向上留 1 屏避免回滑空白
+        var vh = window.innerHeight || document.documentElement.clientHeight;
+        var topLimit = -vh;
+        var bottomLimit = vh * 1.5;
+        // 只要元素与扩展视口有交集就加载（不再要求四边全部落在视口内）
+        return rect.bottom >= topLimit && rect.top <= bottomLimit;
     } catch (e) {
         console.error('视口检查错误:', e);
         return true; // 出错时默认加载
     }
 }
 
-// 重写检查可见封面函数，优先视口检查，其次强制加载
+// 检查可见封面。性能优化（读写分离）：
+// 老 Kindle WebKit 上，“读 getBoundingClientRect → 写 classList”交替会触发强制同步重排，
+// 滑动时表现为卡顿。这里拆成两阶段：阶段1纯读收集候选，阶段2纯写统一加载，杜绝读写交替。
 function checkVisibleCovers() {
-    var lazyCovers = document.querySelectorAll('.lazy-cover:not(.cover-loaded):not(.cover-error):not(.cover-loading)');
-    var loadedCount = 0;
-    
-    if (lazyCovers.length)
-        preloadLog('找到 ' + lazyCovers.length + ' 个待加载封面，滚动计数: ' + lazyScrollCount);
-    // 第一阶段：优先视口检查加载
-    for (var i = 0; i < lazyCovers.length && loadedCount < lazyCoversCount; i++) {
+    // v109优化: 限定在 #bookList 内查询，避免全文档扫描；老 WebKit 的复杂 :not() 选择器在大 DOM 上有成本。
+    var coverScope = $("#bookList");
+    var lazyCovers = coverScope ? coverScope.querySelectorAll('.lazy-cover:not(.cover-loaded):not(.cover-error):not(.cover-loading)') : document.querySelectorAll('.lazy-cover:not(.cover-loaded):not(.cover-error):not(.cover-loading)');
+    if (!lazyCovers.length) return;
+    preloadLog('找到 ' + lazyCovers.length + ' 个待加载封面，滚动计数: ' + lazyScrollCount);
+
+    // ===== 阶段1：纯读，收集可见封面（此阶段不写任何 DOM / class）=====
+    var visibleImgs = [];
+    var invalidImgs = [];
+    for (var i = 0; i < lazyCovers.length; i++) {
         var img = lazyCovers[i];
         var dataSrc = img.getAttribute('data-src');
-        
-        // 安全检查
         if (!dataSrc || !img.parentNode) {
-            img.classList.add('cover-error');
+            invalidImgs.push(img);
             continue;
         }
-        
-        // 优先视口检查
         if (isElementInViewportKindle(img)) {
-            loadCoverImage(img, 0);
-            loadedCount++;
+            visibleImgs.push(img);
         }
     }
-    
-    // 第二阶段：如果视口检查加载数量不足且达到滚动阈值，进行强制加载
+
+    // ===== 阶段2：纯写，统一处理（标记错误 + 触发加载）=====
+    var loadedCount = 0;
+    for (var m = 0; m < invalidImgs.length; m++) {
+        invalidImgs[m].classList.add('cover-error');
+    }
+    for (var n = 0; n < visibleImgs.length && loadedCount < lazyCoversCount; n++) {
+        loadCoverImage(visibleImgs[n], 0);
+        loadedCount++;
+    }
+
+    // 视口内不足且达到滚动阈值时，按文档顺序补足剩余名额（同样在纯写阶段）
     var remainingSlots = lazyCoversCount - loadedCount;
-    if (remainingSlots > 0  && lazyCovers.length && shouldForceLoadCovers()) {
-        preloadLog('视口检查加载了 ' + loadedCount + ' 张，剩余 ' + remainingSlots + ' 个位置，进行强制加载');
-        
-        for (var j = 0; j < lazyCovers.length && loadedCount <lazyCoversCount; j++) {
+    if (remainingSlots > 0 && shouldForceLoadCovers()) {
+        preloadLog('视口加载 ' + loadedCount + ' 张，剩余 ' + remainingSlots + ' 个位置，强制补足');
+        for (var j = 0; j < lazyCovers.length && loadedCount < lazyCoversCount; j++) {
             var forceImg = lazyCovers[j];
-            var forceDataSrc = forceImg.getAttribute('data-src');
-            
-            // 安全检查
-            if (!forceDataSrc || !forceImg.parentNode) {
-                forceImg.classList.add('cover-error');
+            if (forceImg.classList.contains('cover-loading') ||
+                forceImg.classList.contains('cover-loaded') ||
+                forceImg.classList.contains('cover-error')) {
                 continue;
             }
-            
-            // 跳过已经通过视口检查加载的图片
-            if (forceImg.classList.contains('cover-loading') || 
-                forceImg.classList.contains('cover-loaded')) {
-                continue;
-            }
-            
-            // 强制加载
             loadCoverImage(forceImg, 0);
             loadedCount++;
-            
-            // 如果达到最大加载数量，跳出循环
-            if (loadedCount >= lazyCoversCount) {
-                break;
-            }
         }
     }
-    
+
     if (loadedCount > 0) {
         preloadLog('本次总共加载了 ' + loadedCount + ' 张封面');
     }
 }
 
-// 图片加载函数
+// 图片加载函数。性能优化：直接用目标 img 元素加载，去掉 new Image() 二次预加载，
+// 减少一层对象创建与 onload 转手赋值；配合 checkVisibleCovers 的读写分离，滑动更跟手。
 function loadCoverImage(img, retryCount) {
     if (!img || !img.parentNode) {
         preloadLog('图片元素无效，跳过加载');
         return;
     }
-    
+
     var dataSrc = img.getAttribute('data-src');
     if (!dataSrc) {
         preloadLog('没有 data-src，标记为错误');
         img.classList.add('cover-error');
         return;
     }
-    
-    // 检查是否已经在加载中
-    if (img.classList.contains('cover-loading')) {
-        preloadLog('图片已在加载中，跳过:', dataSrc);
+
+    // 已在加载中/已加载/已失败：跳过，避免重复加载
+    if (img.classList.contains('cover-loading') ||
+        img.classList.contains('cover-loaded') ||
+        img.classList.contains('cover-error')) {
         return;
     }
-    
-    // 标记为加载中
-    img.classList.add('cover-loading');
-    
-    preloadLog('开始加载封面: ' + dataSrc + (retryCount > 0 ? ' (重试 ' + retryCount + ')' : ''));
-    var image = new Image();
 
-    image.onerror = function() {
+    // 一次书架会话内已成功加载过的相同URL，直接复用（HTTP 缓存命中，瞬时显示）
+    if (lazyLoadedCovers[dataSrc]) {
+        img.src = dataSrc;
+        img.classList.remove('lazy-cover');
+        img.classList.add('cover-loaded');
+        img.removeAttribute('data-src');
+        return;
+    }
+
+    preloadLog('开始加载封面: ' + dataSrc + (retryCount > 0 ? ' (重试 ' + retryCount + ')' : ''));
+    // 标记为加载中（写在纯写阶段，不与 getBoundingClientRect 交替）
+    img.classList.add('cover-loading');
+
+    img.onerror = function() {
+        img.onerror = null;
+        img.onload = null;
         img.classList.remove('cover-loading');
-        
         if (retryCount < 1) {
             preloadLog('封面加载失败，准备重试: ' + dataSrc);
             setTimeout(function() {
@@ -1268,17 +1281,18 @@ function loadCoverImage(img, retryCount) {
                 }
             }, 500);
         } else {
-            // 最终失败处理
             preloadLog('封面加载最终失败，使用默认图片: ' + dataSrc);
+            img.onerror = null;
             img.src = "img/noCover.jpg";
             img.classList.remove('lazy-cover');
             img.classList.add('cover-error');
             img.removeAttribute('data-src');
         }
     };
-    
-    image.onload = function() {
-        img.src = dataSrc;
+
+    img.onload = function() {
+        img.onerror = null;
+        img.onload = null;
         // WebKit534 的 DOMTokenList.remove 只处理第一个参数，拆成两次单参数调用
         img.classList.remove('lazy-cover');
         img.classList.remove('cover-loading');
@@ -1287,9 +1301,9 @@ function loadCoverImage(img, retryCount) {
         lazyLoadedCovers[dataSrc] = true;
         preloadLog('封面加载成功: ' + dataSrc);
     };
-    
-    // 开始加载
-    image.src = dataSrc;
+
+    // 直接加载：浏览器原生加载 + HTTP 缓存（后端 Cache-Control 86400）
+    img.src = dataSrc;
 }
 
 function cleanupLazyLoad() {
@@ -3900,7 +3914,7 @@ function cleanupMapCache() {
     
     // 限制封面缓存大小
     var coverKeys = Object.keys(lazyLoadedCovers);
-    if (coverKeys.length > lazyLoadedCovers * 10) { // 限制封面缓存
+    if (coverKeys.length > 60) { // v109修复: 原 > lazyLoadedCovers*10 因对象是NaN永远false，封面缓存无上限；改为固定阈值60
         var coversToDelete = coverKeys.slice(0, coverKeys.length - 30);
         for (var j = 0; j < coversToDelete.length; j++) {
             var coverKey = coversToDelete[j];
