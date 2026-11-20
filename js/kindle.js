@@ -2642,33 +2642,88 @@ function mgmtClearCache() {
     });
 }
 
-// 移动书籍：读取已有分组填入下拉框
-function mgmtLoadGroups() {
-    var sel = document.getElementById("mgmtGroupSelect");
-    if (!sel) { return; }
-    sel.options.length = 0;
-    sel.options.add(new Option("未分组", "0"));
-    bmStatus("正在读取分组…");
+// v117: 分组下拉会话级缓存——设置弹窗每次打开都发 getBookGroups，弱网时下拉一直卡在
+//       「正在读取分组…」。缓存命中即同步填充(秒显)，同时后台静默刷新保证跨设备新增分组能同步。
+//       null=尚未成功加载；数组=已加载(含空数组)。页面刷新后变量重置，会重新拉一次最新分组。
+var bookGroupsListCache = null;
+var bookGroupsReqPending = false; // 有在飞的分组请求时不再重复发，避免并发
+
+// v117: 通用分组读取——force=true 强制走网络(成功仍回写缓存)；callback(groups, ok)
+function fetchBookGroups(force, callback) {
+    if (!force && bookGroupsListCache !== null) {
+        if (callback) callback(bookGroupsListCache, true);
+        return;
+    }
+    if (bookGroupsReqPending) { return; }
+    bookGroupsReqPending = true;
     var xhr = new XMLHttpRequest();
     xhr.open("GET", url(getBookGroups), true);
     if (config.type == "multi") { xhr.withCredentials = true; }
     xhr.onreadystatechange = function () {
         if (xhr.readyState !== 4) { return; }
-        if (xhr.status === 200) {
+        bookGroupsReqPending = false;
+        var ok = (xhr.status === 200);
+        var groups = [];
+        if (ok) {
             var res = null;
             try { res = JSON.parse(xhr.responseText); } catch (e) { res = null; }
-            var groups = (res && res.data && res.data.length) ? res.data : [];
-            for (var i = 0; i < groups.length; i++) {
-                var gid = parseInt(groups[i].groupId, 10);
-                if (isNaN(gid)) { gid = 0; }
-                sel.options.add(new Option(groups[i].groupName || ("分组" + gid), String(gid)));
-            }
-            bmStatus(groups.length ? "选择分组后点「移动分组」" : "暂无分组");
-        } else {
-            bmStatus("分组读取失败");
+            groups = (res && res.data && res.data.length) ? res.data : [];
+            bookGroupsListCache = groups; // 仅在成功时回写缓存，失败保留旧值
         }
+        if (callback) callback(groups, ok);
     };
     xhr.send();
+}
+
+// v117: 填充分组下拉；重填时保留用户当前已选项，避免后台刷新打断操作
+function fillGroupSelect(sel, groups) {
+    if (!sel) { return; }
+    var keep = sel.value;
+    sel.options.length = 0;
+    sel.options.add(new Option("未分组", "0"));
+    for (var i = 0; i < groups.length; i++) {
+        var gid = parseInt(groups[i].groupId, 10);
+        if (isNaN(gid)) { gid = 0; }
+        sel.options.add(new Option(groups[i].groupName || ("分组" + gid), String(gid)));
+    }
+    if (keep) {
+        for (var j = 0; j < sel.options.length; j++) {
+            if (sel.options[j].value === keep) { sel.value = keep; break; }
+        }
+    }
+}
+
+// 移动书籍：读取已有分组填入下拉框（v117: 缓存秒显 + 后台静默刷新）
+function mgmtLoadGroups() {
+    var sel = document.getElementById("mgmtGroupSelect");
+    if (!sel) { return; }
+    var useCache = (bookGroupsListCache !== null);
+    if (useCache) {
+        // 命中缓存：同步填充，秒显，不显示「正在读取」
+        fillGroupSelect(sel, bookGroupsListCache);
+        bmStatus(bookGroupsListCache.length ? "选择分组后点「移动分组」" : "暂无分组");
+    } else {
+        bmStatus("正在读取分组…");
+    }
+    // 首次无缓存：等网络回来再填充；命中缓存：后台静默刷新(不改状态栏、保留已选项)
+    fetchBookGroups(false, function (groups, ok) {
+        if (!useCache) {
+            if (ok) {
+                fillGroupSelect(sel, groups);
+                bmStatus(groups.length ? "选择分组后点「移动分组」" : "暂无分组");
+            } else {
+                bmStatus("分组读取失败");
+            }
+        }
+    });
+    // 命中缓存时后台刷新一次，跨设备新增的分组下次打开即可见
+    if (useCache) {
+        setTimeout(function () {
+            fetchBookGroups(true, function (groups, ok) {
+                if (ok) { fillGroupSelect(sel, groups); }
+            });
+        }, 0);
+    }
 }
 
 // 点击「移动分组」按钮后执行（选择下拉框本身不触发）
