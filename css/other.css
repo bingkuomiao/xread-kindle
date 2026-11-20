@@ -230,6 +230,12 @@
     .login-content .form-control {
         font-size: 34px;
         height: 64px;
+        /* v122: 补回 PC/手机端占位/正文垂直居中——v121 全量回退后，主档为 KPW3 设计的
+           line-height:36px + padding:9px 12px 0(上9下0不对称)泄漏到本档(content60)，
+           文本行盒中心 9+18=27 < content 中心 30，Win10 真机截图确认偏上；
+           恢复 v117 时代在 PC 端无投诉的居中值：行高=content 高(60) + 对称 padding。 */
+        line-height: 60px;
+        padding: 0 12px;
     }
     .login-content .btn-primary {
         font-size: 36px;
@@ -349,6 +355,10 @@
     .login-content .form-control {
         font-size: 16px;
         height: 44px;
+        /* v122: 补回 PC/手机端占位/正文垂直居中(理由同 34/64 档)：
+           行高=content 高(40) + 对称 padding，消除主档 Kindle 专用值的泄漏。 */
+        line-height: 40px;
+        padding: 0 12px;
         border-radius: 10px;
         -webkit-border-radius: 10px;
     }
@@ -773,6 +783,12 @@
     .xread-browser .login-content .form-control{
         font-size: 34px;
         height: 64px;
+        /* v122: 补回 PC/手机端占位/正文垂直居中——v121 全量回退后，主档为 KPW3 设计的
+           line-height:36px + padding:9px 12px 0(上9下0不对称)泄漏到本档(content60)，
+           文本行盒中心 9+18=27 < content 中心 30，Win10 真机截图确认偏上；
+           恢复 v117 时代在 PC 端无投诉的居中值：行高=content 高(60) + 对称 padding。 */
+        line-height: 60px;
+        padding: 0 12px;
     }
     .xread-browser .login-content .btn-primary{
         font-size: 36px;
@@ -886,6 +902,10 @@
     .xread-browser .login-content .form-control{
         font-size: 16px;
         height: 44px;
+        /* v122: 补回 PC/手机端占位/正文垂直居中(理由同 34/64 档)：
+           行高=content 高(40) + 对称 padding，消除主档 Kindle 专用值的泄漏。 */
+        line-height: 40px;
+        padding: 0 12px;
         border-radius: 10px;
         -webkit-border-radius: 10px;
     }
