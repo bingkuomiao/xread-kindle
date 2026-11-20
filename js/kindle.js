@@ -1911,6 +1911,57 @@ function shouldKeepChapter(chapterIndex, currentIndex, keepRange) {
     return false;
 }
 
+// ========== v130: 漫画图片代理 + 相邻预取（KPW3 / WebKit 534 / ES5）==========
+// 老 WebKit 正则无 lookbehind，用 (^|\s) 捕获组定位 src，避免误匹配 data-src。
+function comicMatchSrc(tag) {
+    return tag.match(/(^|\s)(src\s*=\s*)(["']?)([^"'\s>]+)\3/);
+}
+
+// 把单张图片 URL 包一层后端代理：data: 内联图 / 相对本地图 / 已代理地址均原样返回。
+function comicProxySrc(rawUrl) {
+    if (!rawUrl) return rawUrl;
+    var u = String(rawUrl).replace(/^\s+|\s+$/g, "");
+    if (/^data:/i.test(u)) return rawUrl;
+    if (u.indexOf("/reader3/cover?path=") >= 0) return rawUrl;
+    if (!/^https?:\/\//i.test(u)) return rawUrl;
+    u = u.replace(/&amp;/gi, "&");
+    return apiBase() + "/reader3/cover?path=" + encodeURIComponent(u);
+}
+
+// 重写 <img> 标签的 src 为代理地址，保留其余属性与原引号风格。
+function comicProxyImgTag(tag) {
+    var m = comicMatchSrc(tag);
+    if (!m || !m[4]) return tag;
+    var proxied = comicProxySrc(m[4]);
+    if (proxied === m[4]) return tag;
+    var idx = tag.indexOf(m[0]);
+    if (idx < 0) return tag;
+    var rebuilt = m[1] + m[2] + m[3] + proxied + m[3];
+    return tag.slice(0, idx) + rebuilt + tag.slice(idx + m[0].length);
+}
+
+// 预取当前页前1后2张图到浏览器缓存：只发请求、不插 DOM、不占布局。
+// 小对象池持有 Image 引用，避免老内核 GC 取消在飞请求；池上限防长会话内存膨胀。
+// v132: 预取代次令牌——翻页时递增，旧页的延迟预取回调据此判废
+var comicPreloadGen = 0;
+var comicPreloadPool = [];
+function comicPreloadNeighbors(pages, pageIndex) {
+    if (!pages || !pages.length) return;
+    var offsets = [-1, 1, 2];
+    for (var i = 0; i < offsets.length; i++) {
+        var idx = pageIndex + offsets[i];
+        if (idx < 0 || idx >= pages.length) continue;
+        var m = comicMatchSrc(pages[idx]);
+        if (!m || !m[4]) continue;
+        var pre = new Image();
+        pre.src = comicProxySrc(m[4]);
+        comicPreloadPool.push(pre);
+    }
+    if (comicPreloadPool.length > 24) {
+        comicPreloadPool = comicPreloadPool.slice(-12);
+    }
+}
+
 // 解析并处理书籍内容
 function disposeBookContent(targetChapterIndex, bookStr) {
     hide(".c_bookshelf");
@@ -1921,7 +1972,13 @@ function disposeBookContent(targetChapterIndex, bookStr) {
     var imgList = bookStr.match(/<img\b[^>]*>/gi);
     if (imgList && imgList.length > 1) {
         isComicMode = true;
-        pageList = imgList;
+        // v130: 每张图 src 包一层后端 /reader3/cover 代理（与书架封面同款）：
+        // 后端按 URL md5 磁盘缓存 + 绕防盗链 + Cache-Control:86400，
+        // 解决 Kindle 弱网直连图床慢 / 防盗链失败；一图一页不变。
+        pageList = [];
+        for (var ci = 0; ci < imgList.length; ci++) {
+            pageList.push(comicProxyImgTag(imgList[ci]));
+        }
     } else {
         isComicMode = false;
         // r92 修复标题与正文之间的多余空行：
@@ -1940,6 +1997,7 @@ function disposeBookContent(targetChapterIndex, bookStr) {
 
 // 显示当前页内容
 function showContent(pages) {
+    comicPreloadGen++;  // v132: 每次显示新页使旧页延迟预取回调失效
     if (currentBookPage > currentBookTotalPage) {
         currentBookPage = currentBookTotalPage;
     }
@@ -1953,6 +2011,30 @@ function showContent(pages) {
             var ch = contentElement.clientHeight || 800;
             theImg.style.maxWidth = cw + 'px';
             theImg.style.maxHeight = ch + 'px';
+            // v130: 图片加载失败兜底，避免破图（noCover 为本地图，不再递归）
+            theImg.onerror = function () {
+                this.onerror = null;
+                this.src = 'img/noCover.jpg';
+            };
+        }
+        // v132 漫画黑屏修复：v130 进入页时立即并发预取前1后2共3张大图 + 当前页，
+        // 4 图同时走后端代理下载，KPW3 弱网下首图被拖慢、E-ink 刷黑时间被拉长。
+        // 改为：首图 load/onerror 后再预取相邻图；generation token 防快速翻页竞态；
+        // 2.5s 超时兜底（图床无响应时仍预取，避免永久不预热）。
+        var v132MyGen = comicPreloadGen;
+        var v132PreFired = false;
+        function v132Preload() {
+            if (v132PreFired) return;
+            v132PreFired = true;
+            if (v132MyGen === comicPreloadGen && isComicMode) {
+                comicPreloadNeighbors(pages, currentBookPage - 1);
+            }
+        }
+        if (theImg && !theImg.complete) {
+            theImg.onload = v132Preload;
+            setTimeout(v132Preload, 2500);
+        } else {
+            v132Preload();
         }
     } else {
         var pageHtml = pages[currentBookPage - 1].replace(/\n/g, '<br>');
