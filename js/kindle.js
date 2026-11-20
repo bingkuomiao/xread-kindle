@@ -3514,36 +3514,6 @@ function initBookElement() {
     sourceColumn2 = document.getElementById("sourceColumn2");
 }
 
-// 禁止输入框聚焦时页面被自动放大（Kindle / 老 WebKit 的 form-control auto zoom）。
-// 关键手段是 CSS 的 -webkit-text-size-adjust:none（老内核唯一可靠值）。
-// 这里只做两件低风险的事：阻止双指缩放手势；聚焦后把滚动位置归零。
-// 不再在 focus/blur 时反复 setAttribute viewport —— 那会触发 viewport 重算，
-// 反而可能造成页面跳动/放大（Kindle 上尤其明显）。
-// Kindle 浏览器会在输入框聚焦时自行放大页面且无视 maximum-scale。
-// 策略：聚焦时不干预（避免打断输入），失焦/resize/首屏后主动重写 viewport 复位缩放。
-// 缩放复位：不再改写 viewport meta。
-// 老 Kindle WebKit 一旦发现 viewport 的 content 被脚本改动，会整条重新解析并重置缩放状态，
-// 表现为「点输入框/点设置后页面变大」，而且会和 resize 互相触发。原版（未适配前）从不改 viewport，
-// 所以没有这个问题——这里只保留函数名做空实现，兼容既有调用点。
-function forceViewportScale() {
-    return;
-}
-
-// 复位整页缩放：重新挂一次 viewport meta，让浏览器按 initial-scale=1 重新校准。
-// 老 Kindle 聚焦输入框时会自行放大（约 1.6 倍）并且失焦后不会自己缩回，
-// 放大状态还会一路带到阅读页——表现为「顶部被切、一页字数变少」。
-// 这里只在失焦 / 切换界面时调用，聚焦期间不做任何事，不打断输入。
-function resetViewportScale() {
-    // r22 回退：还原原始代码「不干预 viewport」的行为。
-    // 原始代码聚焦输入框本就无放大问题；此复位是后期引入的 hack，已停用。
-    return;
-}
-
-function initInputZoomGuard() {
-    // r22 回退：还原原始代码「不干预聚焦缩放」的行为，空实现仅为兼容调用点。
-    return;
-}
-
 /* r93) 字体配置区 −/+ 步进按钮
    点击后按 data-step-delta 增减对应输入框，钳制在 [min,max]；
    行距保留 1 位小数，字号/字距为整数；改值后派发 change 触发即时生效。
@@ -3740,8 +3710,6 @@ function load() {
     initPageOptions();
     // 事件监听器函数
     initEventListeners();
-    // 禁止输入框聚焦时页面被自动放大
-    initInputZoomGuard();
     //初始化统一的事件处理器
     initEventHandlers();
     //统一的键盘事件处理
@@ -3755,8 +3723,6 @@ function load() {
 // 检查登录状态并切换界面
 function checkLoginState() {
       if (accessToken) {
-        // 登录成功后复位一次缩放：避免在登录框里被浏览器放大后，放大状态被带进书架/阅读页
-        resetViewportScale();
         hide(".c_login");
         show(".c_bookshelf");
         show(".menu");
