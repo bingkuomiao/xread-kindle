@@ -66,6 +66,429 @@ function showNotice(id, message) {
 function showLoginError(message) { showNotice("loginError", message); }
 function clearLoginError() { showNotice("loginError", ""); }
 
+// v117: 记住策略改为「只记用户名，不记密码」——登录成功后仅把用户名存本机 localStorage，
+// 刷新页面后自动回填用户名；密码每次手输（明文存本机有安全风险，改为不存）。
+// 同时主动清除 v115/v116 可能遗留的明文密码 key，升级后不再残留历史密码。
+// 注销时按约定不清用户名（刷新后仍在）。老 WebKit 在隐私/受限环境访问 localStorage
+// 可能抛异常，因此每处访问都 try-catch 包裹，失败静默降级、绝不中断登录。
+var LS_LOGIN_USERNAME = "xread_saved_username";
+var LS_LOGIN_PASSWORD = "xread_saved_password"; // v117: 保留常量仅用于清除历史遗留密码，不再写入
+
+function saveLoginCredentials() {
+    if (config.username) {
+        try { window.localStorage.setItem(LS_LOGIN_USERNAME, config.username); } catch (e) { /* localStorage 不可用，静默跳过 */ }
+    }
+    // v117: 不存密码，并清掉旧版本可能遗留的明文密码
+    try { window.localStorage.removeItem(LS_LOGIN_PASSWORD); } catch (e) { /* 静默跳过 */ }
+}
+
+function restoreLoginCredentials() {
+    var uEl = document.getElementById("username");
+    var pEl = document.getElementById("password");
+    var u = null;
+    try { u = window.localStorage.getItem(LS_LOGIN_USERNAME); } catch (e) { u = null; }
+    // v117: 不再回填密码，并清掉旧版本遗留的明文密码
+    try { window.localStorage.removeItem(LS_LOGIN_PASSWORD); } catch (e) { /* 静默跳过 */ }
+    if (uEl && u) uEl.value = u;
+    // v117: 密码框强制留空，确保刷新后每次手输
+    if (pEl) pEl.value = "";
+}
+
+// ===== v121: 登录占位文字覆盖层（仅 Kindle 端） =====
+// KPW3 老 WebKit 对 input 内部占位文字的垂直绘制位置 CSS 不可控
+// (v117 行高/v118 伪元素行高/v120 padding 三次真机均无效)，改用普通 span
+// 覆盖层接管：普通元素的 line-height 垂直居中在 KPW3 上已被标题/按钮验证有效。
+// PC/手机(html.xread-browser)不初始化，覆盖层被 CSS 强制隐藏，原生占位恢复默认——
+// 本方案只影响 Kindle 端。
+var loginPhItems = null;
+
+function isXreadBrowser() {
+    // index.html 头部 UA 脚本：非 Kindle 环境会给 <html> 加 xread-browser 类
+    var cls = "";
+    try { cls = document.documentElement.className || ""; } catch (e) { cls = ""; }
+    return cls.indexOf("xread-browser") !== -1;
+}
+
+function syncLoginPlaceholder() {
+    if (!loginPhItems) return;
+    for (var i = 0; i < loginPhItems.length; i++) {
+        var item = loginPhItems[i];
+        if (!item.input || !item.ph) continue;
+        var cv = vkGetValue(item.input);          // v127: 用缓存值判断，避免缓存期间占位显隐错
+        // v134: 只在显隐状态真正变化时写 className，杜绝每次按键都触发样式重算/重绘
+        var want = (cv && cv.length > 0) ? "login-ph" : "login-ph on";
+        if (item.ph.className !== want) item.ph.className = want;
+    }
+}
+
+function initLoginPlaceholder() {
+    // 只在 Kindle 端启用；PC/手机继续用浏览器原生占位
+    if (isXreadBrowser()) return;
+    loginPhItems = [
+        { input: document.getElementById("username"), ph: document.getElementById("phUsername") },
+        { input: document.getElementById("password"), ph: document.getElementById("phPassword") }
+    ];
+    for (var i = 0; i < loginPhItems.length; i++) {
+        var item = loginPhItems[i];
+        if (!item.input || !item.ph) continue;
+        // 多事件兜底绑定：老 WebKit 对 input 事件的支持不确定，keyup/change 补齐
+        item.input.oninput = syncLoginPlaceholder;
+        item.input.onkeyup = syncLoginPlaceholder;
+        item.input.onchange = syncLoginPlaceholder;
+        // v123: 点击覆盖层直接打开虚拟键盘（不再 focus 输入框——聚焦会弹出系统键盘
+        // 并触发 Kindle 浏览器强制视口放大，见下方虚拟键盘说明）
+        item.ph.onclick = (function (inp) {
+            return function () { openVirtualKeyboard(inp); };
+        })(item.input);
+    }
+    syncLoginPlaceholder();
+    // 回填/自动填充可能晚于初始化，延时再校正一次
+    setTimeout(syncLoginPlaceholder, 500);
+}
+
+// ===== v123: 登录页虚拟键盘（仅 Kindle 端） =====
+// 真机录屏证实：KPW3 浏览器在系统软键盘弹出时强制放大视口（页面变大、内容溢出
+// 屏幕且不可恢复），输入框字号/行高/padding 均无法阻止——这是键盘弹出的伴生行为。
+// 方案：登录输入框设 readonly——不弹出系统键盘；输入改由页面内自绘的
+// 虚拟键盘面板完成（纯 ES5/DOM）。
+// PC/手机(html.xread-browser)不初始化：输入框保持原生可编辑，行为完全不变。
+
+var vkPanelEl = null;
+var vkTargetInput = null;
+var vkShifted = false;
+var vkNumeric = false;
+// v127: 输入镜像层（文本 span + 行内光标），靠自然排版紧跟字符，不再测量宽度
+var vkMirrorItems = null;
+// v127: 输入缓存——按键先写缓存+镜像，不碰真实 input.value；防抖后一次性落盘，
+//       根治「写 value 触发重绘期间又来点击」导致的 KPW3 页面放大。
+var vkPending = { username: null, password: null };
+var vkFlushTimer = null;
+var VK_FLUSH_DELAY = 250;
+// v135: 显示提速——按键后非显示杂务延后一个 tick，让按键同步栈尽早返回
+var vkDeferTimer = null;
+// v134: 密码明文显示窗口——输入后明文显示2秒再变圆点，
+//       每次按键都重绘圆点的同时让用户看清输入；纯显示层，不影响缓存/提交取值。
+var vkRevealPwUntil = 0;        // 密码明文显示截止时间戳(ms)；0=不显示明文
+var vkRevealPwTimer = null;     // 到点重绘为圆点的定时器
+var VK_REVEAL_MS = 2000;
+
+// v127: 取输入框的"当前值"——缓存优先(有未落盘编辑)，否则真实 value
+function vkGetValue(input) {
+    if (!input) return "";
+    var key = (input.id === "password") ? "password" : "username";
+    if (vkPending[key] !== null) return vkPending[key];
+    return input.value || "";
+}
+
+// v127: 密码掩码——镜像层显示与真实 password input 一致的圆点
+function vkDisplayText(input, v) {
+    if (input.type === "password") {
+        // v136: 明文窗口内只显示"当前输入的最后一位"，前面全部圆点(●●●4)——
+        //       让用户看清刚敲的那位，又不暴露整段密码；窗口外全部圆点。
+        //       纯显示层——缓存/提交取值始终是明文，不受影响。
+        var revealLast = !!(vkRevealPwUntil && (new Date()).getTime() < vkRevealPwUntil);
+        var out = "";
+        for (var i = 0; i < v.length; i++) {
+            if (revealLast && i === v.length - 1) out += v.charAt(i);
+            else out += "\u25cf";
+        }
+        return out;
+    }
+    return v;
+}
+
+// v127: 找到输入框对应的镜像项
+function vkMirrorItem(input) {
+    if (!vkMirrorItems || !input) return null;
+    for (var i = 0; i < vkMirrorItems.length; i++) {
+        if (vkMirrorItems[i].input === input) return vkMirrorItems[i];
+    }
+    return null;
+}
+
+// v127: 重绘镜像层——文本用 createTextNode 注入(纯文本，杜绝 HTML 注入)，
+//       光标是紧跟文本的 inline span，浏览器自然排版，无需测量宽度。
+function vkRenderMirror(input) {
+    var item = vkMirrorItem(input);
+    if (!item || !item.text) return;
+    var v = vkGetValue(input);
+    var disp = vkDisplayText(input, v);
+    // v134 根治放大：增量更新——只改现有文本节点的 nodeValue，不再 innerHTML="" 销毁重建。
+    // 连点/连删每次走这里，销毁重建会在 KPW3 E-ink 上堆积局部重绘→布局错乱(表现为放大)。
+    var node = item.text.firstChild;
+    if (node && node.nodeType === 3) {
+        if (node.nodeValue !== disp) node.nodeValue = disp;
+    } else {
+        // 首次尚无文本节点时才创建一次（之后一直复用）
+        item.text.innerHTML = "";
+        item.text.appendChild(document.createTextNode(disp));
+    }
+}
+
+// v127: 立即把缓存写回真实 input.value(一次 DOM 写入)，并清 timer
+function vkFlushInput(input) {
+    if (!input) return;
+    var key = (input.id === "password") ? "password" : "username";
+    if (vkPending[key] === null) return;
+    input.value = vkPending[key];
+    vkPending[key] = null;
+}
+
+// v127: 立即落盘全部缓存（提交/收起/切换输入框前调用）
+function vkFlushAll() {
+    if (vkFlushTimer) { clearTimeout(vkFlushTimer); vkFlushTimer = null; }
+    for (var i = 0; i < (vkMirrorItems ? vkMirrorItems.length : 0); i++) {
+        vkFlushInput(vkMirrorItems[i].input);
+    }
+}
+
+// v127: 防抖落盘——停止输入 VK_FLUSH_DELAY 后才写一次真实 value
+function vkScheduleFlush() {
+    if (vkFlushTimer) clearTimeout(vkFlushTimer);
+    vkFlushTimer = setTimeout(function () {
+        vkFlushTimer = null;
+        if (vkTargetInput) vkFlushInput(vkTargetInput);
+    }, VK_FLUSH_DELAY);
+}
+
+// v127: 设置当前输入框的文本到缓存 + 镜像，不写真实 value
+// v135 显示提速：显示(nodeValue 赋值)排到同步栈最前，密码 timer / placeholder /
+//       flush 调度等非显示杂务延后一个 tick，缩短 touchstart 同步占用，让字符尽快显示。
+function vkSetValue(input, v) {
+    if (!input) return;
+    var key = (input.id === "password") ? "password" : "username";
+    vkPending[key] = v;
+    // v135: 明文截止时间同步更新——vkRenderMirror 里的 vkDisplayText 需要它立即判定明文/圆点
+    if (key === "password") vkRevealPwUntil = (new Date()).getTime() + VK_REVEAL_MS;
+    // v135: 显示优先——最高优先级同步落地，连点/连删的字符第一时间显示
+    vkRenderMirror(input);
+    // v135: 非显示杂务延后一个 tick；连续按键时 clearTimeout 合并为一次，减少抖动
+    if (vkDeferTimer) clearTimeout(vkDeferTimer);
+    vkDeferTimer = setTimeout(function () {
+        vkDeferTimer = null;
+        if (key === "password") {
+            if (vkRevealPwTimer) clearTimeout(vkRevealPwTimer);
+            vkRevealPwTimer = setTimeout(function () {
+                vkRevealPwTimer = null;
+                vkRevealPwUntil = 0;
+                var pw = document.getElementById("password");
+                if (pw) vkRenderMirror(pw);   // 增量重绘：明文→圆点，不销毁节点
+            }, VK_REVEAL_MS);
+        }
+        syncLoginPlaceholder();
+        vkScheduleFlush();
+    }, 0);
+}
+
+function vkInsertText(ch) {
+    if (!vkTargetInput) return;
+    vkSetValue(vkTargetInput, vkGetValue(vkTargetInput) + ch);
+}
+
+function vkBackspace() {
+    if (!vkTargetInput) return;
+    var v = vkGetValue(vkTargetInput);
+    if (v.length > 0) vkSetValue(vkTargetInput, v.substring(0, v.length - 1));
+}
+
+function vkClearActiveMark() {
+    if (!vkTargetInput) return;
+    vkTargetInput.className = vkTargetInput.className.replace(" vk-input-active", "");
+    vkTargetInput = null;
+}
+
+function openVirtualKeyboard(input) {
+    if (!vkPanelEl || !input) return;
+    if (vkTargetInput !== input) {
+        // v127: 切换前先把上一个输入框的缓存落盘，避免丢失
+        if (vkTargetInput) {
+            vkFlushInput(vkTargetInput);
+            vkTargetInput.className = vkTargetInput.className.replace(" vk-input-active", "");
+            var oldItem = vkMirrorItem(vkTargetInput);
+            if (oldItem && oldItem.mirror) oldItem.mirror.className = "input-mirror";
+            vkTargetInput.className = vkTargetInput.className.replace(" vk-mirror-on", "");
+        }
+        vkTargetInput = input;
+        if (vkTargetInput.className.indexOf("vk-input-active") === -1) {
+            vkTargetInput.className += " vk-input-active";
+        }
+        // v127: 当前输入框文字透明，由镜像层显示；镜像层与光标一起显示
+        if (vkTargetInput.className.indexOf("vk-mirror-on") === -1) {
+            vkTargetInput.className += " vk-mirror-on";
+        }
+        var item = vkMirrorItem(input);
+        if (item && item.mirror) item.mirror.className = "input-mirror on";
+        vkRenderMirror(input);
+    }
+    if (vkPanelEl.className.indexOf(" on") === -1) vkPanelEl.className += " on";
+    syncLoginPlaceholder();
+}
+
+function closeVirtualKeyboard() {
+    if (vkFlushTimer) { clearTimeout(vkFlushTimer); vkFlushTimer = null; }
+    // v135: 收起即清未执行的显示杂务，避免关闭后 timer 再触发
+    if (vkDeferTimer) { clearTimeout(vkDeferTimer); vkDeferTimer = null; }
+    // v134: 收起键盘立即结束密码明文窗口，避免残留定时器与明文显示
+    if (vkRevealPwTimer) { clearTimeout(vkRevealPwTimer); vkRevealPwTimer = null; }
+    vkRevealPwUntil = 0;
+    if (vkTargetInput) {
+        vkFlushInput(vkTargetInput);   // 收起即落盘，保证提交读到最新值
+        vkTargetInput.className = vkTargetInput.className.replace(" vk-input-active", "");
+        vkTargetInput.className = vkTargetInput.className.replace(" vk-mirror-on", "");
+        var item = vkMirrorItem(vkTargetInput);
+        if (item && item.mirror) item.mirror.className = "input-mirror";
+    }
+    vkTargetInput = null;
+    if (vkPanelEl) {
+        var cls = "vk-panel" + (vkNumeric ? " num" : "");
+        vkPanelEl.className = cls;
+    }
+}
+
+function vkSetShift(on) {
+    vkShifted = on;
+    if (!vkPanelEl) return;
+    if (on && vkPanelEl.className.indexOf(" shifted") === -1) vkPanelEl.className += " shifted";
+    if (!on) vkPanelEl.className = vkPanelEl.className.replace(" shifted", "");
+}
+
+function vkSetPage(numeric) {
+    vkNumeric = numeric;
+    if (vkPanelEl) {
+        if (numeric && vkPanelEl.className.indexOf(" num") === -1) vkPanelEl.className += " num";
+        if (!numeric) vkPanelEl.className = vkPanelEl.className.replace(" num", "");
+    }
+    vkSetShift(false);
+}
+
+function vkKeyBtns(list, kind) {
+    var arr = list.split(" ");
+    var out = "";
+    for (var i = 0; i < arr.length; i++) {
+        out += '<div class="vk-key vk-k-' + kind + '" data-vk="ch" data-ch="' + arr[i] + '">' + arr[i] + "</div>";
+    }
+    return out;
+}
+
+function buildVirtualKeyboard() {
+    if (vkPanelEl) return;
+    var panel = document.createElement("div");
+    panel.className = "vk-panel";
+    var html = "";
+    // v128: 删除顶部公共数字行（按用户要求）；数字已移入 123 数字符号页，切页即可输入
+    // —— 字母页 ——
+    html += '<div class="vk-page vk-page-abc">';
+    html += '<div class="vk-row">' + vkKeyBtns("q w e r t y u i o p", "letter") + "</div>";
+    html += '<div class="vk-row">' + vkKeyBtns("a s d f g h j k l", "letter") + "</div>";
+    html += '<div class="vk-row"><div class="vk-key vk-key-fn" data-vk="shift">\u21e7</div>'
+        + vkKeyBtns("z x c v b n m", "letter")
+        + '<div class="vk-key vk-key-fn vk-key-del" data-vk="del">\u5220\u9664</div></div>';
+    // v128: 空格键缩短、登录键加长居中、删除键在上一行加长（防误触面积保留）
+    html += '<div class="vk-row">'
+        + '<div class="vk-key vk-key-fn" data-vk="num123">123</div>'
+        + '<div class="vk-key vk-key-narrow" data-vk="ch" data-ch="@">@</div>'
+        + '<div class="vk-key vk-key-narrow" data-vk="ch" data-ch=".">.</div>'
+        + '<div class="vk-key vk-key-fn vk-key-space" data-vk="space">&nbsp;</div>'
+        + '<div class="vk-key vk-key-fn vk-key-login" data-vk="submit">\u767b\u5f55</div>'
+        + '<div class="vk-key vk-key-fn" data-vk="close">\u6536\u8d77</div>'
+        + "</div></div>";
+    // —— 数字符号页 ——（v128: 数字 1-0 已移回本页首行，点 123 切页即可输入纯数字密码）
+    html += '<div class="vk-page vk-page-num">';
+    html += '<div class="vk-row">' + vkKeyBtns("1 2 3 4 5 6 7 8 9 0", "digit") + "</div>";
+    html += '<div class="vk-row">' + vkKeyBtns("@ . - _ # + /", "sym") + "</div>";
+    html += '<div class="vk-row">'
+        + '<div class="vk-key vk-key-fn" data-vk="space">&nbsp;</div>'
+        + vkKeyBtns("( ) ! ? : ;", "sym")
+        + '<div class="vk-key vk-key-fn vk-key-del" data-vk="del">\u5220\u9664</div>'
+        + "</div>";
+    // v129: 数字页两键换位——收起键在中间且缩短(20%)，登录键在末尾占满剩余(长)
+    html += '<div class="vk-row">'
+        + '<div class="vk-key vk-key-fn vk-key-space" data-vk="abc">ABC</div>'
+        + '<div class="vk-key vk-key-fn" data-vk="close">\u6536\u8d77</div>'
+        + '<div class="vk-key vk-key-fn" data-vk="submit">\u767b\u5f55</div>'
+        + "</div></div>";
+    panel.innerHTML = html;
+    document.body.appendChild(panel);
+    vkPanelEl = panel;
+    // v127: 初始化镜像项（文本 span + 光标 span），Kindle 端 input 文字由镜像接管
+    vkMirrorItems = [
+        { input: document.getElementById("username"), mirror: document.getElementById("mirrorUsername"), text: null },
+        { input: document.getElementById("password"), mirror: document.getElementById("mirrorPassword"), text: null }
+    ];
+    for (var mi = 0; mi < vkMirrorItems.length; mi++) {
+        var mit = vkMirrorItems[mi];
+        if (mit.mirror) mit.text = mit.mirror.getElementsByTagName("span")[0];
+    }
+    // 按键事件委托：统一处理面板内所有按键（老 WebKit addEventListener 支持）
+    panel.addEventListener("click", vkHandleKey);
+}
+
+function vkHandleKey(e) {
+    var t = e.target || e.srcElement;
+    if (!t || t.nodeType !== 1) return;
+    var act = t.getAttribute("data-vk");
+    if (!act) return;
+    if (act === "ch") {
+        var ch = t.getAttribute("data-ch") || "";
+        if (vkShifted && t.className.indexOf("vk-k-letter") !== -1) {
+            ch = ch.toUpperCase();
+            vkSetShift(false);   // 一次大写后自动回落小写
+        }
+        vkInsertText(ch);
+    } else if (act === "del") {
+        vkBackspace();
+    } else if (act === "space") {
+        vkInsertText(" ");
+    } else if (act === "shift") {
+        vkSetShift(!vkShifted);
+    } else if (act === "num123") {
+        vkSetPage(true);
+    } else if (act === "abc") {
+        vkSetPage(false);
+    } else if (act === "close") {
+        closeVirtualKeyboard();
+    } else if (act === "submit") {
+        closeVirtualKeyboard();
+        var btn = document.getElementById("loginSubmit");
+        if (btn) btn.click();
+    }
+}
+
+
+function initLoginVirtualKeyboard() {
+    // 只在 Kindle 端启用；PC/手机输入框保持原生可编辑
+    if (isXreadBrowser()) return;
+    var inputs = [document.getElementById("username"), document.getElementById("password")];
+    var found = 0;
+    var i;
+    for (i = 0; i < inputs.length; i++) {
+        if (!inputs[i]) continue;
+        inputs[i].readOnly = true;   // readonly 聚焦不弹系统键盘
+        found++;
+    }
+    if (!found) return;
+    buildVirtualKeyboard();
+    for (i = 0; i < inputs.length; i++) {
+        if (!inputs[i]) continue;
+        inputs[i].addEventListener("click", function () { openVirtualKeyboard(this); });
+    }
+    // v124: 点击输入框与虚拟键盘以外区域时收起键盘——事件冒泡到 document 统一判定，
+    // 面板内部、两个输入框、占位覆盖层(login-ph)都算"键盘相关区域"不收起。
+    document.addEventListener("click", function (e) {
+        if (!vkPanelEl) return;
+        if (vkPanelEl.className.indexOf(" on") === -1) return;
+        var t = e.target || e.srcElement;
+        while (t && t.nodeType === 1) {
+            if (t === vkPanelEl) return;
+            if (t.id === "username" || t.id === "password") return;
+            var c = t.className || "";
+            if (c.indexOf && c.indexOf("login-ph") !== -1) return;
+            t = t.parentNode;
+        }
+        closeVirtualKeyboard();
+    });
+}
+
 // 「没有账号？注册」<->「已有账号？登录」
 function toggleLoginMode() {
     clearLoginError();
@@ -3138,6 +3561,12 @@ function load() {
     initCSSLoadStyle();
     //获取需要的DOM引用
     initBookElement();
+    // v115: 回填已记住的用户名密码，刷新后无需重输（失败静默降级）
+    restoreLoginCredentials();
+    // v121: 登录占位文字覆盖层（仅 Kindle 端生效；须在回填之后初始化以同步显隐）
+    initLoginPlaceholder();
+    // v123: 登录虚拟键盘（仅 Kindle 端；readonly 输入框 + 自绘面板，避免系统键盘放大页面）
+    initLoginVirtualKeyboard();
     // 应用默认字体设置
     applyFontSettings();
     //初始化对话框值
@@ -3288,6 +3717,7 @@ function loginBookshelf() {
         getBookshelf();
         return;
     } else if (type == "multi") {// 多用户模式
+        vkFlushAll();  // v127: 提交前把镜像缓存一次性落盘，保证读到最新值
         config.username = $("#username").value;
         config.password = $("#password").value;
         clearLoginError();
@@ -3306,6 +3736,8 @@ function loginBookshelf() {
         HttpPost(url(login_url), params, function(res) {
             if (res && res.isSuccess) {
                 accessToken = res.data.accessToken;
+                // v115: 记住本次登录的用户名密码（输入框原文），供刷新后回填
+                saveLoginCredentials();
                 clearLoginError();
                 getBookshelf();
             } else {
@@ -3333,10 +3765,9 @@ function updateLoginConfig(){
 }
 
 function login() {
-    // 点「登录」时先把被浏览器放大的整页缩回 1:1：
-    // 老 Kindle 聚焦输入框后会一直停在放大状态，若不在这里复位，
-    // 放大会被原封不动地带进书架和阅读页（表现为正文顶部被切、一页字数变少）。
-    resetViewportScale();
+    // v124: 提交登录先收起虚拟键盘——用户可能直接点表单上的「登录」按钮（不走键盘
+    // submit 键），不收起会把键盘带到书架页；登录失败时键盘保持收起，重开一次即可。
+    closeVirtualKeyboard();
     // 页面值获取
     updateLoginConfig();
     // 登录书架
